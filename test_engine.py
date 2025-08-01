@@ -81,11 +81,7 @@ def test_evaluation():
         score = evaluator.evaluate(board)
         print(f"After e2-e4 evaluation: {score}")
 
-if __name__ == "__main__":
-    test_board()
-    test_evaluation()
-    test_move_validation()
-    test_search_simple()
+def test_move_validation():
     """Test move validation and illegal move detection."""
     print("\n" + "="*50)
     print("Testing move validation...")
@@ -124,7 +120,7 @@ def test_search_simple():
     print("Testing simple search...")
     
     from search import NegascoutSearch
-    from bitboard_evaluation import Evaluation
+    from evaluation import Evaluation
     
     board = Board()
     evaluator = Evaluation()
@@ -141,3 +137,9 @@ def test_search_simple():
         from_sq = Square.from_index(best_move.from_square)
         to_sq = Square.from_index(best_move.to_square)
         print(f"Move details: {from_sq} -> {to_sq}")
+
+if __name__ == "__main__":
+    test_board()
+    test_evaluation()
+    test_move_validation()
+    test_search_simple()
