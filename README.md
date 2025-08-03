@@ -23,9 +23,9 @@ The engine combines the best of both worlds:
 **Custom Components**:
 - `evaluation.py` - Your chess evaluation with tunable parameters
 - `data_collector.py` - Comprehensive thought and idea logging
-- `hybrid_engine.py` - Engine core that injects custom evaluation
-- `engine.py` - User-friendly interface with analysis tools
+- `engine.py` - Complete integrated engine with search, evaluation, and analysis
 - `uci_interface.py` - UCI protocol handler for GUI compatibility
+- `testing/` - Test suite for engine validation and UCI compliance
 
 ### Quick Start
 ```bash
@@ -33,7 +33,10 @@ The engine combines the best of both worlds:
 pip install python-chess
 
 # Test the engine
-python test_engine.py
+python testing/test_engine.py
+
+# Test UCI interface
+python testing/test_uci.py
 
 # Run with UCI interface (for chess GUIs)
 python uci_interface.py

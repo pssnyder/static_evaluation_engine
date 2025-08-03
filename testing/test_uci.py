@@ -19,6 +19,7 @@ Then type UCI commands like:
 import subprocess
 import sys
 import time
+import os
 
 
 def test_uci_basic():
@@ -26,9 +27,10 @@ def test_uci_basic():
     print("=== UCI Interface Test ===")
     print("Starting UCI engine...")
     
-    # Start the UCI process
+    # Start the UCI process (path relative to parent directory)
+    uci_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uci_interface.py")
     process = subprocess.Popen(
-        [sys.executable, "uci_interface.py"],
+        [sys.executable, uci_path],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -100,9 +102,10 @@ def interactive_uci():
     print("Type UCI commands (or 'help' for examples, 'exit' to quit)")
     print()
     
-    # Start the UCI process
+    # Start the UCI process (path relative to parent directory)
+    uci_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uci_interface.py")
     process = subprocess.Popen(
-        [sys.executable, "uci_interface.py"],
+        [sys.executable, uci_path],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

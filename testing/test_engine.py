@@ -9,6 +9,10 @@ This demonstrates how your new hybrid engine works:
 Run this to see your engine in action!
 """
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from engine import ChessEngine
 import time
 
@@ -59,7 +63,7 @@ def main():
     
     # Test 4: Tune evaluation parameters
     print("=== Test 4: Parameter Tuning ===")
-    print("Current material weight:", engine.engine.evaluator.weights['material'])
+    print("Current material weight:", engine.evaluator.weights['material'])
     engine.tune_evaluation('material', 1.2)
     print("New analysis after tuning:")
     engine.analyze_position()
