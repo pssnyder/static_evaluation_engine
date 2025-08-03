@@ -1,5 +1,5 @@
 """
-Hybrid Chess Engine - Complete Implementation
+'Cece' Hybrid Chess Engine
 
 This engine combines the best of both worlds:
 - Uses python-chess for reliable infrastructure (move generation, board representation, etc.)
@@ -11,7 +11,7 @@ Architecture:
 - Focuses your effort on evaluation, pattern recognition, and analysis
 - Maintains ethical use of open source while clearly defining your contributions
 
-Author: Your Name
+Author: Pat Snyder
 License: GPL-3.0 (compatible with python-chess)
 Attribution: Built on python-chess library by Niklas Fiekas
 """
@@ -68,9 +68,9 @@ class ChessEngine:
         
         # Engine metadata
         self.info = {
-            'name': 'YourChessEngine',
+            'name': 'Cece',
             'version': '1.0',
-            'author': 'Your Name',
+            'author': 'Pat Snyder',
             'description': 'Hybrid engine focusing on custom evaluation and analysis',
             'license': 'GPL-3.0',
             'attribution': 'Built on python-chess by Niklas Fiekas'

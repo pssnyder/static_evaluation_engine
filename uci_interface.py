@@ -132,7 +132,7 @@ class UCIInterface:
         
         # Set position on engine
         self.engine.set_position(fen, moves)
-        self.log(f"Position set: {self.engine.engine.board.fen()}")
+        self.log(f"Position set: {self.engine.board.fen()}")
     
     def handle_go(self, parts: List[str]):
         """Handle the 'go' command - start searching."""
@@ -196,7 +196,7 @@ class UCIInterface:
         # If we have time controls, calculate time for this move
         if wtime is not None and btime is not None:
             # Simple time management: use 1/30th of remaining time
-            side_time = wtime if self.engine.engine.board.turn == chess.WHITE else btime
+            side_time = wtime if self.engine.board.turn == chess.WHITE else btime
             time_limit = min(side_time / 30000.0, 10.0)  # Convert ms to seconds, max 10s
         
         self.log(f"Searching: depth={search_depth}, time={time_limit}s")
