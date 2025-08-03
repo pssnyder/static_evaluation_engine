@@ -1,192 +1,282 @@
 """
-UCI (Universal Chess Interface) implementation for the chess engine.
+UCI (Universal Chess Interface) Implementation for Hybrid Engine
+
+This provides a standard interface for chess GUIs and other engines to communicate
+with your hybrid engine. The UCI protocol is the standard way chess engines
+communicate with chess software.
+
+Author: Your Name
+License: GPL-3.0 (compatible with python-chess)
+Attribution: Built on python-chess library by Niklas Fiekas
 """
 
 import sys
 import threading
+from typing import Optional, List
 from engine import ChessEngine
-from bitboard import Move, Square
+import chess
 
 
 class UCIInterface:
-    """UCI protocol handler."""
+    """
+    UCI protocol implementation for the hybrid chess engine.
+    
+    This allows your engine to work with:
+    - Chess GUIs (ChessBase, Arena, etc.)
+    - Online platforms
+    - Engine tournaments
+    - Analysis tools
+    """
     
     def __init__(self):
         self.engine = ChessEngine()
-        self.search_thread = None
-        self.stop_search = False
+        self.running = True
+        self.debug = False
         
-    def run(self):
-        """Main UCI loop."""
-        while True:
-            try:
-                command = input().strip()
-                self.handle_command(command)
-            except EOFError:
-                break
-            except KeyboardInterrupt:
-                break
+    def send(self, message: str):
+        """Send a message to the GUI."""
+        print(message, flush=True)
+        if self.debug:
+            print(f">>> {message}", file=sys.stderr, flush=True)
     
-    def handle_command(self, command: str):
-        """Handle UCI commands."""
-        parts = command.split()
-        if not parts:
-            return
-        
-        cmd = parts[0].lower()
-        
-        if cmd == "uci":
-            self.handle_uci()
-        elif cmd == "isready":
-            self.handle_isready()
-        elif cmd == "ucinewgame":
-            self.handle_ucinewgame()
-        elif cmd == "position":
-            self.handle_position(parts[1:])
-        elif cmd == "go":
-            self.handle_go(parts[1:])
-        elif cmd == "stop":
-            self.handle_stop()
-        elif cmd == "quit":
-            self.handle_quit()
-        elif cmd == "d" or cmd == "display":
-            # Non-standard command for debugging
-            self.engine.print_board()
-        else:
-            pass  # Unknown command, ignore
+    def log(self, message: str):
+        """Log debug information."""
+        if self.debug:
+            print(f"DEBUG: {message}", file=sys.stderr, flush=True)
     
     def handle_uci(self):
-        """Handle 'uci' command."""
-        print("id name Static Evaluation Engine")
-        print("id author Python Chess Engine")
-        print("option name Hash type spin default 32 min 1 max 1024")
-        print("option name Threads type spin default 1 min 1 max 8")
-        print("uciok")
+        """Handle the 'uci' command - identify the engine."""
+        self.send(f"id name {self.engine.info['name']}")
+        self.send(f"id author {self.engine.info['author']}")
+        
+        # Engine options that can be configured
+        self.send("option name Debug type check default false")
+        self.send("option name Hash type spin default 64 min 1 max 1024")
+        self.send("option name Threads type spin default 1 min 1 max 8")
+        self.send("option name MaterialWeight type spin default 100 min 50 max 200")
+        self.send("option name PositionalWeight type spin default 30 min 0 max 100")
+        self.send("option name TacticalWeight type spin default 20 min 0 max 100")
+        self.send("option name SafetyWeight type spin default 15 min 0 max 100")
+        
+        self.send("uciok")
     
     def handle_isready(self):
-        """Handle 'isready' command."""
-        print("readyok")
+        """Handle the 'isready' command."""
+        self.send("readyok")
+    
+    def handle_setoption(self, parts: List[str]):
+        """Handle the 'setoption' command."""
+        if len(parts) >= 4 and parts[1] == "name":
+            name = parts[2]
+            if len(parts) >= 5 and parts[3] == "value":
+                value = parts[4]
+                
+                if name == "Debug":
+                    self.debug = value.lower() == "true"
+                    self.log(f"Debug mode: {self.debug}")
+                elif name == "Hash":
+                    # Note: python-chess doesn't use hash tables in the same way
+                    # but we acknowledge the setting
+                    self.log(f"Hash size set to {value} MB")
+                elif name == "Threads":
+                    self.log(f"Threads set to {value}")
+                elif name == "MaterialWeight":
+                    weight = float(value) / 100.0
+                    self.engine.tune_evaluation("material", weight)
+                    self.log(f"Material weight set to {weight}")
+                elif name == "PositionalWeight":
+                    weight = float(value) / 100.0
+                    self.engine.tune_evaluation("positional", weight)
+                    self.log(f"Positional weight set to {weight}")
+                elif name == "TacticalWeight":
+                    weight = float(value) / 100.0
+                    self.engine.tune_evaluation("tactical", weight)
+                    self.log(f"Tactical weight set to {weight}")
+                elif name == "SafetyWeight":
+                    weight = float(value) / 100.0
+                    self.engine.tune_evaluation("safety", weight)
+                    self.log(f"Safety weight set to {weight}")
     
     def handle_ucinewgame(self):
-        """Handle 'ucinewgame' command."""
+        """Handle the 'ucinewgame' command."""
+        # Reset the engine for a new game
         self.engine = ChessEngine()
+        self.log("New game started")
     
-    def handle_position(self, args):
-        """Handle 'position' command."""
-        if not args:
+    def handle_position(self, parts: List[str]):
+        """Handle the 'position' command."""
+        if len(parts) < 2:
             return
         
-        if args[0] == "startpos":
-            self.engine.set_position()
-            move_idx = 2 if len(args) > 1 and args[1] == "moves" else 1
-        elif args[0] == "fen":
-            # Find where moves start
-            move_idx = None
-            fen_parts = []
-            
-            for i, arg in enumerate(args[1:], 1):
-                if arg == "moves":
-                    move_idx = i + 1
-                    break
-                fen_parts.append(arg)
-            
-            if fen_parts:
-                fen = " ".join(fen_parts)
-                self.engine.set_position(fen)
+        if parts[1] == "startpos":
+            # Starting position
+            fen = None
+            moves_start = 2
+            if len(parts) > 2 and parts[2] == "moves":
+                moves_start = 3
+        elif parts[1] == "fen":
+            # FEN position
+            if len(parts) < 8:
+                return
+            fen = " ".join(parts[2:8])
+            moves_start = 8
+            if len(parts) > 8 and parts[8] == "moves":
+                moves_start = 9
         else:
             return
         
-        # Apply moves
-        if move_idx and move_idx < len(args):
-            for move_str in args[move_idx:]:
-                if not self.engine.make_move_string(move_str):
-                    print(f"info string Invalid move: {move_str}")
-                    break
+        # Extract moves if present
+        moves = []
+        if moves_start < len(parts):
+            moves = parts[moves_start:]
+        
+        # Set position on engine
+        self.engine.set_position(fen, moves)
+        self.log(f"Position set: {self.engine.engine.board.fen()}")
     
-    def handle_go(self, args):
-        """Handle 'go' command."""
-        # Parse go parameters
+    def handle_go(self, parts: List[str]):
+        """Handle the 'go' command - start searching."""
+        # Parse go command parameters
         depth = None
         movetime = None
         wtime = None
         btime = None
         winc = None
         binc = None
+        infinite = False
         
-        i = 0
-        while i < len(args):
-            if args[i] == "depth" and i + 1 < len(args):
-                depth = int(args[i + 1])
-                i += 2
-            elif args[i] == "movetime" and i + 1 < len(args):
-                movetime = int(args[i + 1]) / 1000.0  # Convert ms to seconds
-                i += 2
-            elif args[i] == "wtime" and i + 1 < len(args):
-                wtime = int(args[i + 1]) / 1000.0
-                i += 2
-            elif args[i] == "btime" and i + 1 < len(args):
-                btime = int(args[i + 1]) / 1000.0
-                i += 2
-            elif args[i] == "winc" and i + 1 < len(args):
-                winc = int(args[i + 1]) / 1000.0
-                i += 2
-            elif args[i] == "binc" and i + 1 < len(args):
-                binc = int(args[i + 1]) / 1000.0
-                i += 2
+        i = 1
+        while i < len(parts):
+            if parts[i] == "depth":
+                if i + 1 < len(parts):
+                    depth = int(parts[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            elif parts[i] == "movetime":
+                if i + 1 < len(parts):
+                    movetime = float(parts[i + 1]) / 1000.0  # Convert ms to seconds
+                    i += 2
+                else:
+                    i += 1
+            elif parts[i] == "wtime":
+                if i + 1 < len(parts):
+                    wtime = int(parts[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            elif parts[i] == "btime":
+                if i + 1 < len(parts):
+                    btime = int(parts[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            elif parts[i] == "winc":
+                if i + 1 < len(parts):
+                    winc = int(parts[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            elif parts[i] == "binc":
+                if i + 1 < len(parts):
+                    binc = int(parts[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            elif parts[i] == "infinite":
+                infinite = True
+                i += 1
             else:
                 i += 1
         
         # Determine search parameters
-        search_depth = depth if depth else 6
-        search_time = movetime if movetime else 5.0
+        search_depth = depth if depth is not None else self.engine.search_depth
+        time_limit = movetime if movetime is not None else self.engine.time_limit
         
-        # Time management (simplified)
-        if not movetime and (wtime or btime):
-            from bitboard import Color
-            my_time = wtime if self.engine.board.to_move == Color.WHITE else btime
-            if my_time:
-                # Use a fraction of remaining time
-                search_time = min(my_time / 30, 10.0)
+        # If we have time controls, calculate time for this move
+        if wtime is not None and btime is not None:
+            # Simple time management: use 1/30th of remaining time
+            side_time = wtime if self.engine.engine.board.turn == chess.WHITE else btime
+            time_limit = min(side_time / 30000.0, 10.0)  # Convert ms to seconds, max 10s
         
-        # Start search in separate thread
-        self.stop_search = False
-        self.search_thread = threading.Thread(
-            target=self.search_worker, 
-            args=(search_depth, search_time)
+        self.log(f"Searching: depth={search_depth}, time={time_limit}s")
+        
+        # Start search in a separate thread to allow for stop commands
+        search_thread = threading.Thread(
+            target=self._search_and_respond,
+            args=(search_depth, time_limit)
         )
-        self.search_thread.start()
+        search_thread.start()
     
-    def search_worker(self, depth: int, time_limit: float):
-        """Worker function for search."""
+    def _search_and_respond(self, depth: int, time_limit: float):
+        """Perform the search and send the result."""
         try:
             best_move = self.engine.get_best_move(depth, time_limit)
-            if best_move and not self.stop_search:
-                print(f"bestmove {best_move}")
+            if best_move:
+                self.send(f"bestmove {best_move}")
             else:
-                # No legal moves or search stopped
-                legal_moves = self.engine.get_legal_moves()
-                if legal_moves:
-                    print(f"bestmove {legal_moves[0]}")
-                else:
-                    print("bestmove 0000")  # No legal moves
+                # No legal moves (checkmate or stalemate)
+                self.send("bestmove 0000")
         except Exception as e:
-            print(f"info string Error in search: {e}")
-            print("bestmove 0000")
+            self.log(f"Search error: {e}")
+            self.send("bestmove 0000")
     
     def handle_stop(self):
-        """Handle 'stop' command."""
-        self.stop_search = True
-        if self.search_thread and self.search_thread.is_alive():
-            self.search_thread.join(timeout=1.0)
+        """Handle the 'stop' command."""
+        # For now, we don't implement search interruption
+        # The search will complete and return normally
+        self.log("Stop command received")
     
     def handle_quit(self):
-        """Handle 'quit' command."""
-        self.handle_stop()
-        sys.exit(0)
+        """Handle the 'quit' command."""
+        self.running = False
+        self.log("Quitting...")
+    
+    def run(self):
+        """Main UCI loop."""
+        self.log(f"Starting {self.engine.info['name']} UCI interface")
+        
+        while self.running:
+            try:
+                line = input().strip()
+                if not line:
+                    continue
+                
+                self.log(f"<<< {line}")
+                parts = line.split()
+                
+                if not parts:
+                    continue
+                
+                command = parts[0]
+                
+                if command == "uci":
+                    self.handle_uci()
+                elif command == "isready":
+                    self.handle_isready()
+                elif command == "setoption":
+                    self.handle_setoption(parts)
+                elif command == "ucinewgame":
+                    self.handle_ucinewgame()
+                elif command == "position":
+                    self.handle_position(parts)
+                elif command == "go":
+                    self.handle_go(parts)
+                elif command == "stop":
+                    self.handle_stop()
+                elif command == "quit":
+                    self.handle_quit()
+                else:
+                    self.log(f"Unknown command: {command}")
+                    
+            except EOFError:
+                break
+            except Exception as e:
+                self.log(f"Error processing command: {e}")
 
 
 def main():
-    """Main entry point for UCI interface."""
+    """Entry point for UCI interface."""
     uci = UCIInterface()
     uci.run()
 

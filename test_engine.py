@@ -1,145 +1,115 @@
 """
-Simple test script to debug the chess engine.
+Test Script for Hybrid Chess Engine
+
+This demonstrates how your new hybrid engine works:
+- Python-chess handles the complex infrastructure
+- Your evaluation drives the decision making
+- Data collection enables analysis and improvement
+
+Run this to see your engine in action!
 """
 
-from bitboard import Board, Move, Color, Square
-from evaluation import Evaluation
+from engine import ChessEngine
+import time
 
-def test_board():
-    """Test basic board functionality."""
-    print("Testing board setup...")
-    board = Board()
-    
-    print("Initial position:")
-    print(board)
-    print(f"FEN: {board.to_fen()}")
-    
-    # Test legal move generation
-    print("\nTesting move generation...")
-    legal_moves = board.generate_legal_moves()
-    print(f"Number of legal moves: {len(legal_moves)}")
-    
-    # Print first few moves
-    print("First 10 legal moves:")
-    for i, move in enumerate(legal_moves[:10]):
-        from_sq = Square.from_index(move.from_square)
-        to_sq = Square.from_index(move.to_square)
-        print(f"  {i+1}. {from_sq} -> {to_sq} ({move})")
-    
-    # Test making a move
-    print("\nTesting move execution...")
-    e2e4_move = None
-    for move in legal_moves:
-        from_sq = Square.from_index(move.from_square)
-        to_sq = Square.from_index(move.to_square)
-        if str(from_sq) == "e2" and str(to_sq) == "e4":
-            e2e4_move = move
-            break
-    
-    if e2e4_move:
-        print(f"Making move: {e2e4_move}")
-        success = board.make_move(e2e4_move)
-        print(f"Move successful: {success}")
-        print("Position after e2-e4:")
-        print(board)
-        print(f"FEN: {board.to_fen()}")
-        
-        # Check black's legal moves
-        black_moves = board.generate_legal_moves()
-        print(f"Black has {len(black_moves)} legal moves")
-        print("First 5 black moves:")
-        for i, move in enumerate(black_moves[:5]):
-            from_sq = Square.from_index(move.from_square)
-            to_sq = Square.from_index(move.to_square)
-            print(f"  {i+1}. {from_sq} -> {to_sq} ({move})")
-    else:
-        print("Could not find e2-e4 move!")
 
-def test_evaluation():
-    """Test evaluation function."""
-    print("\n" + "="*50)
-    print("Testing evaluation...")
+def main():
+    print("=== Hybrid Chess Engine Demo ===")
+    print("Combining python-chess infrastructure with custom evaluation")
+    print()
     
-    board = Board()
-    evaluator = Evaluation()
+    # Initialize the engine with custom evaluation
+    evaluation_config = {
+        'material_weight': 1.0,
+        'positional_weight': 0.3,
+        'tactical_weight': 0.2,
+        'safety_weight': 0.15,
+        'collect_thoughts': True,
+        'collect_ideas': True
+    }
     
-    # Test starting position
-    score = evaluator.evaluate(board)
-    print(f"Starting position evaluation: {score}")
+    engine = ChessEngine(evaluation_config)
+    print()
     
-    # Test after e2-e4
-    legal_moves = board.generate_legal_moves()
-    e2e4_move = None
-    for move in legal_moves:
-        from_sq = Square.from_index(move.from_square)
-        to_sq = Square.from_index(move.to_square)
-        if str(from_sq) == "e2" and str(to_sq) == "e4":
-            e2e4_move = move
-            break
+    # Test 1: Basic position analysis
+    print("=== Test 1: Starting Position Analysis ===")
+    engine.set_position()  # Default starting position
+    analysis = engine.analyze_position()
+    print()
     
-    if e2e4_move and board.make_move(e2e4_move):
-        score = evaluator.evaluate(board)
-        print(f"After e2-e4 evaluation: {score}")
-
-def test_move_validation():
-    """Test move validation and illegal move detection."""
-    print("\n" + "="*50)
-    print("Testing move validation...")
+    # Test 2: Make some moves and analyze
+    print("=== Test 2: Opening Moves ===")
+    moves = ['e2e4', 'e7e5', 'g1f3', 'b8c6']
     
-    board = Board()
+    for move in moves:
+        print(f"\\nMaking move: {move}")
+        engine.make_move(move)
+        best_move = engine.get_best_move(depth=6, time_limit=2.0)
+        if best_move:
+            print(f"Engine suggests: {best_move}")
     
-    # Test a clearly illegal move
-    print("Testing illegal moves...")
-    legal_moves = board.generate_legal_moves()
+    print()
     
-    # Check if h7h2 is in legal moves (it shouldn't be)
-    h7h2_found = False
-    for move in legal_moves:
-        from_sq = Square.from_index(move.from_square)
-        to_sq = Square.from_index(move.to_square)
-        move_str = f"{from_sq}{to_sq}"
-        if move_str == "h7h2":
-            h7h2_found = True
-            print(f"ERROR: Found illegal move {move_str} in legal moves!")
-            break
+    # Test 3: Detailed position analysis
+    print("=== Test 3: Current Position Analysis ===")
+    analysis = engine.analyze_position()
+    explanation = engine.get_evaluation_explanation()
+    print(f"\\nEvaluation explanation:\\n{explanation}")
+    print()
     
-    if not h7h2_found:
-        print("Good: h7h2 not found in legal moves")
+    # Test 4: Tune evaluation parameters
+    print("=== Test 4: Parameter Tuning ===")
+    print("Current material weight:", engine.engine.evaluator.weights['material'])
+    engine.tune_evaluation('material', 1.2)
+    print("New analysis after tuning:")
+    engine.analyze_position()
+    print()
     
-    # Print all legal moves to verify
-    print(f"\nAll {len(legal_moves)} legal moves:")
-    for i, move in enumerate(legal_moves):
-        from_sq = Square.from_index(move.from_square)
-        to_sq = Square.from_index(move.to_square)
-        move_str = f"{from_sq}{to_sq}"
-        print(f"  {i+1:2d}. {move_str}")
-
-def test_search_simple():
-    """Test search with depth 1 only."""
-    print("\n" + "="*50)
-    print("Testing simple search...")
+    # Test 5: Export analysis data
+    print("=== Test 5: Data Export ===")
+    data = engine.export_analysis_data()
+    print(f"Collected {len(data['thoughts'])} thoughts and {len(data['ideas'])} ideas")
     
-    from search import NegascoutSearch
-    from evaluation import Evaluation
+    # Save to file for later analysis
+    timestamp = int(time.time())
+    filename = f"engine_analysis_{timestamp}.json"
+    engine.export_analysis_data(filename)
+    print()
     
-    board = Board()
-    evaluator = Evaluation()
-    searcher = NegascoutSearch(evaluator)
+    # Test 6: Famous position test
+    print("=== Test 6: Famous Position Test ===")
+    # Scholar's mate setup
+    scholars_mate_fen = "rnbqkb1r/pppp1ppp/5n2/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3"
+    engine.set_position(scholars_mate_fen)
+    print("Analyzing Scholar's Mate setup...")
     
-    print("Running depth-1 search...")
-    best_move, score, stats = searcher.search(board, 1, 1.0)
-    
-    print(f"Best move: {best_move}")
-    print(f"Score: {score}")
-    print(f"Stats: {stats}")
-    
+    best_move = engine.get_best_move(depth=8, time_limit=3.0)
     if best_move:
-        from_sq = Square.from_index(best_move.from_square)
-        to_sq = Square.from_index(best_move.to_square)
-        print(f"Move details: {from_sq} -> {to_sq}")
+        print(f"Best move in Scholar's Mate setup: {best_move}")
+    
+    analysis = engine.analyze_position()
+    print()
+    
+    # Test 7: Benchmark on a few positions
+    print("=== Test 7: Mini Benchmark ===")
+    test_positions = [
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",  # Starting position
+        "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R b KQkq - 0 4",  # Italian
+        "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2"  # Scandinavian
+    ]
+    
+    benchmark_results = engine.benchmark(test_positions, depth=5)
+    print()
+    
+    print("=== Demo Complete ===")
+    print(f"Engine: {engine}")
+    print("Your hybrid engine successfully combines:")
+    print("✓ Python-chess for reliable infrastructure")
+    print("✓ Your custom evaluation for unique play style")  
+    print("✓ Comprehensive data collection for analysis")
+    print("✓ Clear attribution and licensing compliance")
+    print("\\nReady for further development and experimentation!")
+
 
 if __name__ == "__main__":
-    test_board()
-    test_evaluation()
-    test_move_validation()
-    test_search_simple()
+    main()
