@@ -64,19 +64,19 @@ class Evaluation:
     
     def init_piece_square_tables(self):
         """Initialize piece-square tables for positional evaluation."""
-        # Pawn table (encourage central control and advancement)
+        # Pawn table - encourages advancement and center control
         self.pawn_table = [
-             0,  0,  0,  0,  0,  0,  0,  0,
-            50, 50, 50, 50, 50, 50, 50, 50,
-            10, 10, 20, 30, 30, 20, 10, 10,
-             5,  5, 10, 25, 25, 10,  5,  5,
-             0,  0,  0, 20, 20,  0,  0,  0,
-             5, -5,-10,  0,  0,-10, -5,  5,
-             5, 10, 10,-20,-20, 10, 10,  5,
-             0,  0,  0,  0,  0,  0,  0,  0
+             0,  0,  0,  0,  0,  0,  0,  0,  # 8th rank (promotion)
+            50, 50, 50, 50, 50, 50, 50, 50,  # 7th rank 
+            10, 10, 20, 30, 30, 20, 10, 10,  # 6th rank
+             5,  5, 10, 25, 25, 10,  5,  5,  # 5th rank
+             0,  0,  0, 20, 20,  0,  0,  0,  # 4th rank
+             5,  5,-10, 10, 10,-10, -5,  5,  # 3rd rank
+             5, 10, 10,-20,-20, 10, 10,  5,  # 2nd rank
+             0,  0,  0,  0,  0,  0,  0,  0   # 1st rank
         ]
         
-        # Knight table (encourage central squares)
+        # Knight table - heavily penalizes rim placement
         self.knight_table = [
             -50,-40,-30,-30,-30,-30,-40,-50,
             -40,-20,  0,  0,  0,  0,-20,-40,
@@ -85,10 +85,68 @@ class Evaluation:
             -30,  0, 15, 20, 20, 15,  0,-30,
             -30,  5, 10, 15, 15, 10,  5,-30,
             -40,-20,  0,  5,  5,  0,-20,-40,
-            -50,-40,-30,-30,-30,-30,-40,-50
+            -50,-20,-30,-30,-30,-30,-20,-50
         ]
         
-        # More tables can be added as needed...
+        # Bishop table - encourages long diagonals
+        self.bishop_table = [
+            -20,-10,-10,-10,-10,-10,-10,-20,
+            -10,  0,  0,  0,  0,  0,  0,-10,
+            -10,  0,  5, 10, 10,  5,  0,-10,
+            -10,  5,  5, 10, 10,  5,  5,-10,
+            -10,  0, 10, 10, 10, 10,  0,-10,
+            -10, 10, 10, 10, 10, 10, 10,-10,
+            -10,  5,  0,  0,  0,  0,  5,-10,
+            -20,-10,-20,-10,-10,-20,-10,-20
+        ]
+        
+        # Rook table - encourages 7th rank and center files
+        self.rook_table = [
+             0,  0,  0,  0,  0,  0,  0,  0,
+             5, 10, 10, 10, 10, 10, 10,  5,
+            -5,  0,  0,  0,  0,  0,  0, -5,
+            -5,  0,  0,  0,  0,  0,  0, -5,
+            -5,  0,  0,  0,  0,  0,  0, -5,
+            -5,  0,  0,  0,  0,  0,  0, -5,
+            -5,  0,  0,  0,  0,  0,  0, -5,
+             0,  0,  0,  5,  5,  0,  0,  0
+        ]
+        
+        # Queen table - discourages early development
+        self.queen_table = [
+            -20,-10,-10, -5, -5,-10,-10,-20,
+            -10,  0,  0,  0,  0,  0,  0,-10,
+            -10,  0,  5,  5,  5,  5,  0,-10,
+             -5,  0,  5,  5,  5,  5,  0, -5,
+              0,  0,  5,  5,  5,  5,  0, -5,
+            -10,  5,  5,  5,  5,  5,  0,-10,
+            -10,  0,  5,  0,  0,  0,  0,-10,
+            -20,-10,-10, -5, -5,-10,-10,-20
+        ]
+        
+        # King middlegame table - encourages castling and safety
+        self.king_mg_table = [
+            -30,-40,-40,-50,-50,-40,-40,-30,
+            -30,-40,-40,-50,-50,-40,-40,-30,
+            -30,-40,-40,-50,-50,-40,-40,-30,
+            -30,-40,-40,-50,-50,-40,-40,-30,
+            -20,-30,-30,-40,-40,-30,-30,-20,
+            -10,-20,-20,-20,-20,-20,-20,-10,
+             20, 20,  0,  0,  0,  0, 20, 20,
+             20, 30, 10,  0,  0, 10, 30, 20
+        ]
+
+        # King endgame table - encourages activity
+        self.king_eg_table = [
+            -50,-40,-30,-20,-20,-30,-40,-50,
+            -30,-20,-10,  0,  0,-10,-20,-30,
+            -30,-10, 20, 30, 30, 20,-10,-30,
+            -30,-10, 30, 40, 40, 30,-10,-30,
+            -30,-10, 30, 40, 40, 30,-10,-30,
+            -30,-10, 20, 30, 30, 20,-10,-30,
+            -30,-30,  0,  0,  0,  0,-30,-30,
+            -50,-30,-30,-30,-30,-30,-30,-50
+        ]
     
     def evaluate(self, board: chess.Board) -> int:
         """
@@ -189,8 +247,8 @@ class Evaluation:
         """
         Evaluate positional factors using piece-square tables.
         
-        YOUR CUSTOM POSITIONAL LOGIC - modify these tables and
-        add more positional concepts as desired.
+        YOUR CUSTOM POSITIONAL LOGIC - now includes all piece types
+        with improved piece-square tables.
         """
         score = 0
         
@@ -208,7 +266,33 @@ class Evaluation:
         for square in board.pieces(chess.KNIGHT, chess.BLACK):
             score -= self.knight_table[chess.square_mirror(square)]
         
-        # Add more positional evaluations here...
+        # Evaluate bishops
+        for square in board.pieces(chess.BISHOP, chess.WHITE):
+            score += self.bishop_table[square]
+        
+        for square in board.pieces(chess.BISHOP, chess.BLACK):
+            score -= self.bishop_table[chess.square_mirror(square)]
+        
+        # Evaluate rooks
+        for square in board.pieces(chess.ROOK, chess.WHITE):
+            score += self.rook_table[square]
+        
+        for square in board.pieces(chess.ROOK, chess.BLACK):
+            score -= self.rook_table[chess.square_mirror(square)]
+        
+        # Evaluate queens
+        for square in board.pieces(chess.QUEEN, chess.WHITE):
+            score += self.queen_table[square]
+        
+        for square in board.pieces(chess.QUEEN, chess.BLACK):
+            score -= self.queen_table[chess.square_mirror(square)]
+        
+        # Evaluate kings (using middlegame table for now - could be made game-phase dependent)
+        for square in board.pieces(chess.KING, chess.WHITE):
+            score += self.king_mg_table[square]
+        
+        for square in board.pieces(chess.KING, chess.BLACK):
+            score -= self.king_mg_table[chess.square_mirror(square)]
         
         return score
     
