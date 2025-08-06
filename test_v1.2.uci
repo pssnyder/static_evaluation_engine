@@ -1,5 +1,0 @@
-uci
-isready
-position startpos moves e2e4 e7e5 d1h5
-go depth 3
-quit
