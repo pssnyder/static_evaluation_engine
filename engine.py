@@ -69,7 +69,7 @@ class ChessEngine:
         # Engine metadata
         self.info = {
             'name': 'Cece',
-            'version': '1.0',
+            'version': '1.1',
             'author': 'Pat Snyder',
             'description': 'Hybrid engine focusing on custom evaluation and analysis',
             'license': 'GPL-3.0',

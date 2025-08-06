@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Engine Architecture Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: "Calm Neutral" - A professional and focused theme with warm neutrals, a calming blue accent, and dark text for high readability. -->
+    <!-- Application Structure Plan: A single-page dashboard layout with a fixed top navigation bar for easy access to different sections. The structure is designed to guide the user from a high-level overview (Architecture) to detailed component analysis, then to dynamic process visualization (Data Flow), a breakdown of evaluation intelligence, and finally to hands-on experimentation (Evaluation Tuner). This logical flow facilitates a deep understanding of the engine's core, directly addressing the user's goal. -->
+    <!-- Visualization & Content Choices: 
+        - Architecture Diagram: Report Info -> System Components & Dependencies. Goal -> Organize. Viz -> Interactive HTML/CSS diagram. Interaction -> Click to scroll. Justification -> Provides a clear, high-level map of the system. Method -> HTML/CSS with JS for interaction.
+        - Component Breakdown: Report Info -> File roles, functions, dependencies. Goal -> Inform. Viz -> Detailed text cards. Interaction -> None. Justification -> Delivers essential information clearly. Method -> HTML/CSS.
+        - Data Flow: Report Info -> Search/Evaluation/Data Collection process. Goal -> Explain Change/Process. Viz -> Animated step-by-step flow diagram. Interaction -> Play/Reset animation. Justification -> Makes a complex process easy to follow. Method -> HTML/CSS/JS.
+        - Evaluation Intelligence Breakdown: Report Info -> Detailed evaluation logic, piece-square tables. Goal -> Inform/Organize. Viz -> Text cards and an interactive HTML/CSS board for PSTs. Interaction -> Button toggles for different piece tables and board perspective. Justification -> Visualizes key evaluation data that is difficult to represent in a simple chart. Method -> HTML/CSS/JS.
+        - Evaluation Tuner: Report Info -> Evaluation weights and their impact. Goal -> Compare/Interact. Viz -> Sliders and a dynamic bar chart. Interaction -> User adjusts sliders to see real-time chart updates. Justification -> Provides hands-on experience with the evaluation core. Method -> Chart.js.
+        - Data Collection: Report Info -> "Thought" and "Idea" data structures. Goal -> Inform. Viz -> Formatted JSON display. Interaction -> Tooltips on hover. Justification -> Clarifies the research-oriented output. Method -> HTML/CSS/JS.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFDFB;
+            color: #374151;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+        .flow-step {
+            opacity: 0.3;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+            transform: translateY(10px);
+        }
+        .flow-step.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .component-box {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .component-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 1 / 1;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .board-square {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.75rem;
+            border: 1px solid #e5e7eb;
+            background-color: #f3f4f6;
+        }
+        .board-square:nth-child(8n):not(:last-child),
+        .board-square:nth-child(8n-7):not(:last-child) {
+            border-left: none;
+            border-right: none;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-200">
+        <nav class="container mx-auto px-4 lg:px-6 py-3">
+            <div class="flex flex-wrap justify-between items-center">
+                <a href="#" class="flex items-center">
+                    <span class="text-xl font-bold text-gray-800">Engine Architecture Visualizer</span>
+                </a>
+                <div class="hidden lg:flex items-center space-x-8 text-sm font-medium">
+                    <a href="#architecture" class="text-gray-600 hover:text-blue-500 transition-colors">Architecture</a>
+                    <a href="#components" class="text-gray-600 hover:text-blue-500 transition-colors">Components</a>
+                    <a href="#flow" class="text-gray-600 hover:text-blue-500 transition-colors">Data Flow</a>
+                    <a href="#evaluation-details" class="text-gray-600 hover:text-blue-500 transition-colors">Evaluation Breakdown</a>
+                    <a href="#tuner" class="text-gray-600 hover:text-blue-500 transition-colors">Evaluation Tuner</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-4 lg:px-6 py-8 md:py-12">
+
+        <section id="introduction" class="text-center mb-16">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">Understanding Your Chess Engine</h1>
+            <p class="text-lg text-gray-600 max-w-3xl mx-auto">An interactive exploration of the components, dependencies, and core logic of your hybrid chess engine. This dashboard visualizes the system's design to aid in development and tuning.</p>
+        </section>
+
+        <section id="architecture" class="mb-20 scroll-mt-20">
+            <h2 class="text-3xl font-bold text-center mb-2 text-gray-800">System Architecture</h2>
+            <p class="text-center text-gray-500 mb-10">A high-level overview of the engine's modular design. Click on a component to learn more.</p>
+            
+            <div class="bg-gray-50 p-6 md:p-10 rounded-2xl border border-gray-200">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                    
+                    <div class="space-y-6">
+                        <div id="diagram-ui" class="component-box bg-white p-4 rounded-lg border cursor-pointer" onclick="document.getElementById('comp-uci').scrollIntoView({behavior: 'smooth'});">
+                            <h4 class="font-bold text-blue-600">📦 UI Layer (UCI)</h4>
+                            <p class="text-sm text-gray-500">`uci_interface.py`</p>
+                        </div>
+                        <div class="pl-8 text-center text-2xl font-thin text-gray-400">↓</div>
+                        <div id="diagram-engine" class="component-box bg-white p-4 rounded-lg border cursor-pointer" onclick="document.getElementById('comp-engine').scrollIntoView({behavior: 'smooth'});">
+                            <h4 class="font-bold text-green-600">🧠 Core Engine</h4>
+                            <p class="text-sm text-gray-500">`engine.py`</p>
+                        </div>
+                        <div class="pl-8 text-center text-2xl font-thin text-gray-400">↓</div>
+                        <div class="flex items-center justify-center space-x-4">
+                            <div class="text-center text-2xl font-thin text-gray-400">↘</div>
+                            <div class="text-center text-2xl font-thin text-gray-400">↓</div>
+                            <div class="text-center text-2xl font-thin text-gray-400">↙</div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div id="diagram-eval" class="component-box text-center bg-white p-4 rounded-lg border cursor-pointer" onclick="document.getElementById('comp-eval').scrollIntoView({behavior: 'smooth'});">
+                                <h4 class="font-bold text-purple-600">💡 Eval</h4>
+                                <p class="text-sm text-gray-500">`evaluation.py`</p>
+                            </div>
+                            <div id="diagram-infra" class="component-box text-center bg-white p-4 rounded-lg border cursor-pointer" onclick="document.getElementById('comp-infra').scrollIntoView({behavior: 'smooth'});">
+                                <h4 class="font-bold text-gray-600">🛠️ Infra</h4>
+                                <p class="text-sm text-gray-500">`python-chess`</p>
+                            </div>
+                             <div id="diagram-data" class="component-box text-center bg-white p-4 rounded-lg border cursor-pointer" onclick="document.getElementById('comp-data').scrollIntoView({behavior: 'smooth'});">
+                                <h4 class="font-bold text-yellow-600">🔬 Data</h4>
+                                <p class="text-sm text-gray-500">`data_collector.py`</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-lg border border-dashed">
+                        <h3 class="font-bold text-lg mb-3">Architectural Philosophy</h3>
+                        <div class="space-y-4 text-gray-600">
+                            <p><strong>Hybrid Design:</strong> The engine intelligently separates the "what" from the "how." Your custom `evaluation.py` decides *what* makes a position good, while the robust `python-chess` library handles *how* to search the game tree and manage the board.</p>
+                            <p><strong>Modularity:</strong> Each file has a distinct, single responsibility. This makes the system easier to understand, debug, and extend. For example, to change the engine's playing style, you only need to modify `evaluation.py`.</p>
+                            <p><strong>Research-Oriented:</strong> The `data_collector.py` is a powerful, forward-thinking component. It logs the engine's entire thought process, creating a rich dataset perfect for analysis, tuning, and even future machine learning applications.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="components" class="mb-20 scroll-mt-20">
+            <h2 class="text-3xl font-bold text-center mb-10 text-gray-800">Component Breakdown</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                
+                <div id="comp-engine" class="bg-white p-6 rounded-2xl border border-gray-200">
+                    <h3 class="text-xl font-bold mb-2 text-green-700">engine.py (The Orchestrator)</h3>
+                    <p class="text-sm text-gray-600 mb-4">The heart of the engine. It manages state, initiates searches, and coordinates all other components.</p>
+                    <div class="text-sm space-y-2">
+                        <p><strong>Role:</strong> Connects the UCI to the search and evaluation logic.</p>
+                        <p><strong>Key Functions:</strong> `search_position()`, `_alpha_beta()`</p>
+                        <p><strong>Dependencies:</strong> `evaluation.py`, `data_collector.py`, `python-chess`</p>
+                    </div>
+                </div>
+
+                <div id="comp-eval" class="bg-white p-6 rounded-2xl border border-gray-200">
+                    <h3 class="text-xl font-bold mb-2 text-purple-700">evaluation.py (The "Personality")</h3>
+                    <p class="text-sm text-gray-600 mb-4">This is your core IP. It contains all the hand-crafted logic that defines the engine's playing style.</p>
+                     <div class="text-sm space-y-2">
+                        <p><strong>Role:</strong> Assigns a numerical score to any given board position.</p>
+                        <p><strong>Key Functions:</strong> `evaluate_detailed()`, `detect_custom_patterns()`</p>
+                        <p><strong>Dependencies:</strong> `python-chess`</p>
+                    </div>
+                </div>
+
+                <div id="comp-data" class="bg-white p-6 rounded-2xl border border-gray-200">
+                    <h3 class="text-xl font-bold mb-2 text-yellow-700">data_collector.py (The Researcher)</h3>
+                    <p class="text-sm text-gray-600 mb-4">A sophisticated tool for analysis and tuning, logging the engine's "thinking" process.</p>
+                     <div class="text-sm space-y-2">
+                        <p><strong>Role:</strong> Logs "Thoughts" (evaluations) and "Ideas" (principal variations).</p>
+                        <p><strong>Key Classes:</strong> `ThoughtCollector`, `IdeaCollector`</p>
+                        <p><strong>Dependencies:</strong> None (self-contained)</p>
+                    </div>
+                </div>
+
+                <div id="comp-uci" class="bg-white p-6 rounded-2xl border border-gray-200">
+                    <h3 class="text-xl font-bold mb-2 text-blue-700">uci_interface.py (The Translator)</h3>
+                    <p class="text-sm text-gray-600 mb-4">The bridge to the outside world, allowing communication with GUIs like Arena or Lichess.</p>
+                     <div class="text-sm space-y-2">
+                        <p><strong>Role:</strong> Parses and responds to the standard UCI protocol.</p>
+                        <p><strong>Key Functions:</strong> `handle_position()`, `handle_go()`</p>
+                        <p><strong>Dependencies:</strong> `engine.py`</p>
+                    </div>
+                </div>
+
+                <div id="comp-infra" class="bg-white p-6 rounded-2xl border border-gray-200">
+                    <h3 class="text-xl font-bold mb-2 text-gray-700">python-chess (The Foundation)</h3>
+                    <p class="text-sm text-gray-600 mb-4">The robust, battle-tested library that provides the engine's core infrastructure.</p>
+                     <div class="text-sm space-y-2">
+                        <p><strong>Role:</strong> Handles move generation, board representation, and game state.</p>
+                        <p><strong>Key Functions:</strong> `Board()`, `legal_moves`, `push()`, `pop()`</p>
+                        <p><strong>Dependencies:</strong> External Library</p>
+                    </div>
+                </div>
+                 <div class="bg-white p-6 rounded-2xl border border-gray-200">
+                    <h3 class="text-xl font-bold mb-2 text-gray-700">testing/ (The Guardian)</h3>
+                    <p class="text-sm text-gray-600 mb-4">The quality assurance suite that ensures all components work together correctly.</p>
+                     <div class="text-sm space-y-2">
+                        <p><strong>Role:</strong> Validates engine functionality and UCI compliance.</p>
+                        <p><strong>Key Files:</strong> `test_engine.py`, `test_uci.py`</p>
+                        <p><strong>Dependencies:</strong> `engine.py`, `uci_interface.py`</p>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <section id="flow" class="mb-20 scroll-mt-20">
+            <h2 class="text-3xl font-bold text-center mb-2 text-gray-800">Engine Data Flow</h2>
+            <p class="text-center text-gray-500 mb-10">An animated visualization of the engine's "thinking" process for a single move search.</p>
+            <div class="bg-gray-50 p-6 md:p-10 rounded-2xl border border-gray-200">
+                <div class="flex justify-center mb-6">
+                    <button id="play-flow-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                        ▶️ Play Animation
+                    </button>
+                </div>
+                <div class="relative space-y-4">
+                    <div id="flow-1" class="flow-step bg-white p-4 rounded-lg border flex items-center space-x-4">
+                        <span class="text-2xl">📡</span>
+                        <div><strong class="text-blue-600">UCI Command:</strong> `go depth 3` is received from the GUI.</div>
+                    </div>
+                    <div class="pl-8 text-xl font-thin text-gray-400">↓</div>
+                    <div id="flow-2" class="flow-step bg-white p-4 rounded-lg border flex items-center space-x-4">
+                        <span class="text-2xl">🧠</span>
+                        <div><strong class="text-green-600">Engine Search:</strong> `engine.py` starts the Alpha-Beta search.</div>
+                    </div>
+                    <div class="pl-8 text-xl font-thin text-gray-400">↓</div>
+                    <div id="flow-3" class="flow-step bg-white p-4 rounded-lg border flex items-center space-x-4">
+                        <span class="text-2xl">🌳</span>
+                        <div><strong class="text-gray-600">Tree Traversal:</strong> The search explores a move. At a leaf node, it needs a score.</div>
+                    </div>
+                    <div class="pl-8 text-xl font-thin text-gray-400">↓</div>
+                    <div id="flow-4" class="flow-step bg-white p-4 rounded-lg border flex items-center space-x-4">
+                        <span class="text-2xl">💡</span>
+                        <div><strong class="text-purple-600">Evaluation Call:</strong> `evaluation.py` is called to score the position.</div>
+                    </div>
+                    <div class="pl-8 text-xl font-thin text-gray-400">↓</div>
+                     <div id="flow-5" class="flow-step bg-white p-4 rounded-lg border flex items-center space-x-4">
+                        <span class="text-2xl">✍️</span>
+                        <div><strong class="text-yellow-600">Thought Logged:</strong> `data_collector.py` records the detailed evaluation as a "Thought".</div>
+                    </div>
+                    <div class="pl-8 text-xl font-thin text-gray-400">↓</div>
+                     <div id="flow-6" class="flow-step bg-white p-4 rounded-lg border flex items-center space-x-4">
+                        <span class="text-2xl">📈</span>
+                        <div><strong class="text-gray-600">Score Returned:</strong> The score propagates back up the search tree.</div>
+                    </div>
+                     <div class="pl-8 text-xl font-thin text-gray-400">↓</div>
+                    <div id="flow-7" class="flow-step bg-white p-4 rounded-lg border flex items-center space-x-4">
+                        <span class="text-2xl">🏆</span>
+                        <div><strong class="text-green-600">Idea Formed:</strong> A new best line (Principal Variation) is found and logged as an "Idea".</div>
+                    </div>
+                     <div class="pl-8 text-xl font-thin text-gray-400">↓</div>
+                    <div id="flow-8" class="flow-step bg-white p-4 rounded-lg border flex items-center space-x-4">
+                        <span class="text-2xl">📤</span>
+                        <div><strong class="text-blue-600">UCI Response:</strong> Engine sends `bestmove e2e4` back to the GUI.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="evaluation-details" class="mb-20 scroll-mt-20">
+            <h2 class="text-3xl font-bold text-center mb-2 text-gray-800">Evaluation Intelligence Breakdown</h2>
+            <p class="text-center text-gray-500 mb-10">A deep dive into the scoring components that make up your engine's unique personality, from simple material counts to complex positional heuristics and pattern recognition.</p>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                <div>
+                    <h3 class="text-xl font-bold mb-4 text-gray-800">Piece-Square Tables (PSTs)</h3>
+                    <p class="text-sm text-gray-600 mb-4">Pieces are not created equal; their value changes based on their position. This is the core of your positional scoring logic. The board below shows the value for each square from White's perspective.</p>
+                    <div class="flex space-x-4 mb-4">
+                        <button id="toggle-pawn-btn" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Show Pawn Values</button>
+                        <button id="toggle-knight-btn" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Show Knight Values</button>
+                        <button id="flip-board-btn" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Flip Board</button>
+                    </div>
+                    <div class="board-grid shadow-lg rounded-lg"></div>
+                </div>
+
+                <div class="space-y-6">
+                    <h3 class="text-xl font-bold mb-4 text-gray-800">Other Key Factors</h3>
+                    
+                    <div class="bg-white p-6 rounded-2xl border border-gray-200">
+                        <h4 class="font-bold text-lg text-blue-600">⚖️ Material Balance</h4>
+                        <p class="text-sm text-gray-600 mt-2">The most fundamental score. Each piece has a base value: Pawn (100), Knight (320), Bishop (330), Rook (500), Queen (900). The engine sums the difference between White's and Black's total.</p>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-2xl border border-gray-200">
+                        <h4 class="font-bold text-lg text-green-600">👑 King Safety</h4>
+                        <p class="text-sm text-gray-600 mt-2">The engine penalizes positions where the king is exposed to attacks or lacks a strong pawn shield. A safe king is a high priority, especially in the middle game.</p>
+                    </div>
+                    
+                     <div class="bg-white p-6 rounded-2xl border border-gray-200">
+                        <h4 class="font-bold text-lg text-yellow-600">🏗️ Pawn Structure</h4>
+                        <p class="text-sm text-gray-600 mt-2">Your engine evaluates pawn formations, applying penalties for weaknesses like doubled or isolated pawns. A strong pawn structure is a key strategic advantage.</p>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-2xl border border-gray-200">
+                        <h4 class="font-bold text-lg text-purple-600">🎯 Tactical Patterns</h4>
+                        <p class="text-sm text-gray-600 mt-2">This is where your unique patterns reside. The engine detects and applies bonuses for tactical opportunities like forks, pins, skewers, and other custom strategic advantages.</p>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <section id="tuner" class="mb-20 scroll-mt-20">
+            <h2 class="text-3xl font-bold text-center mb-2 text-gray-800">Interactive Evaluation Tuner</h2>
+            <p class="text-center text-gray-500 mb-10">See how your custom evaluation "personality" works. Adjust the weights to see their real-time impact on the score of a sample position.</p>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center bg-gray-50 p-6 md:p-10 rounded-2xl border border-gray-200">
+                <div class="space-y-6">
+                    <div>
+                        <label for="material-slider" class="block mb-2 text-sm font-medium text-gray-900">Material Weight</label>
+                        <input id="material-slider" type="range" min="0.5" max="2.0" value="1.0" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                    <div>
+                        <label for="positional-slider" class="block mb-2 text-sm font-medium text-gray-900">Positional Weight</label>
+                        <input id="positional-slider" type="range" min="0.0" max="1.0" value="0.5" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                     <div>
+                        <label for="safety-slider" class="block mb-2 text-sm font-medium text-gray-900">King Safety Weight</label>
+                        <input id="safety-slider" type="range" min="0.0" max="1.0" value="0.6" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                     <div>
+                        <label for="pawn-slider" class="block mb-2 text-sm font-medium text-gray-900">Pawn Structure Weight</label>
+                        <input id="pawn-slider" type="range" min="0.0" max="1.0" value="0.4" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                    <div class="text-center pt-4">
+                        <p class="text-gray-600">Total Evaluation Score:</p>
+                        <p id="total-score" class="text-4xl font-bold text-blue-600">155</p>
+                    </div>
+                </div>
+                <div>
+                    <div class="chart-container">
+                        <canvas id="evalChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            const initialBaseScores = {
+                material: 100,
+                positional: 50,
+                safety: 30,
+                pawn: -15
+            };
+
+            const weights = {
+                material: 1.0,
+                positional: 0.5,
+                safety: 0.6,
+                pawn: 0.4
+            };
+
+            const sliders = {
+                material: document.getElementById('material-slider'),
+                positional: document.getElementById('positional-slider'),
+                safety: document.getElementById('safety-slider'),
+                pawn: document.getElementById('pawn-slider')
+            };
+
+            const totalScoreEl = document.getElementById('total-score');
+
+            const ctx = document.getElementById('evalChart').getContext('2d');
+            const evalChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Material', 'Positional', 'King Safety', 'Pawn Structure'],
+                    datasets: [{
+                        label: 'Evaluation Score (Centipawns)',
+                        data: [],
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.7)',
+                            'rgba(16, 185, 129, 0.7)',
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(245, 158, 11, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(59, 130, 246, 1)',
+                            'rgba(16, 185, 129, 1)',
+                            'rgba(239, 68, 68, 1)',
+                            'rgba(245, 158, 11, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Score Contribution'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Score: ${context.raw}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            function updateChart() {
+                const weightedScores = {
+                    material: Math.round(initialBaseScores.material * weights.material),
+                    positional: Math.round(initialBaseScores.positional * weights.positional),
+                    safety: Math.round(initialBaseScores.safety * weights.safety),
+                    pawn: Math.round(initialBaseScores.pawn * weights.pawn)
+                };
+
+                const chartData = [
+                    weightedScores.material,
+                    weightedScores.positional,
+                    weightedScores.safety,
+                    weightedScores.pawn
+                ];
+
+                evalChart.data.datasets[0].data = chartData;
+                evalChart.update();
+
+                const totalScore = chartData.reduce((sum, val) => sum + val, 0);
+                totalScoreEl.textContent = totalScore;
+            }
+
+            Object.keys(sliders).forEach(key => {
+                sliders[key].addEventListener('input', (e) => {
+                    weights[key] = parseFloat(e.target.value);
+                    updateChart();
+                });
+            });
+
+            updateChart();
+
+            const playFlowBtn = document.getElementById('play-flow-btn');
+            const flowSteps = document.querySelectorAll('.flow-step');
+            let currentStep = 0;
+            let flowInterval;
+
+            function runFlowAnimation() {
+                playFlowBtn.disabled = true;
+                playFlowBtn.textContent = 'Animating...';
+                
+                flowSteps.forEach(step => step.classList.remove('active'));
+                currentStep = 0;
+
+                flowInterval = setInterval(() => {
+                    if (currentStep < flowSteps.length) {
+                        flowSteps[currentStep].classList.add('active');
+                        currentStep++;
+                    } else {
+                        clearInterval(flowInterval);
+                        playFlowBtn.disabled = false;
+                        playFlowBtn.textContent = '▶️ Replay Animation';
+                    }
+                }, 700);
+            }
+
+            playFlowBtn.addEventListener('click', () => {
+                clearInterval(flowInterval);
+                runFlowAnimation();
+            });
+            
+            const navLinks = document.querySelectorAll('header a');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href');
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        targetElement.scrollIntoView({ behavior: 'smooth' });
+                    }
+                });
+            });
+
+            const pawnTable = [
+                 0,  0,  0,  0,  0,  0,  0,  0,
+                50, 50, 50, 50, 50, 50, 50, 50,
+                10, 10, 20, 30, 30, 20, 10, 10,
+                 5,  5, 10, 25, 25, 10,  5,  5,
+                 0,  0,  0, 20, 20,  0,  0,  0,
+                 5, -5,-10,  0,  0,-10, -5,  5,
+                 5, 10, 10,-20,-20, 10, 10,  5,
+                 0,  0,  0,  0,  0,  0,  0,  0
+            ];
+            
+            const knightTable = [
+                -50,-40,-30,-30,-30,-30,-40,-50,
+                -40,-20,  0,  0,  0,  0,-20,-40,
+                -30,  0, 10, 15, 15, 10,  0,-30,
+                -30,  5, 15, 20, 20, 15,  5,-30,
+                -30,  0, 15, 20, 20, 15,  0,-30,
+                -30,  5, 10, 15, 15, 10,  5,-30,
+                -40,-20,  0,  5,  5,  0,-20,-40,
+                -50,-40,-30,-30,-30,-30,-40,-50
+            ];
+
+            const boardContainer = document.querySelector('.board-grid');
+            const togglePawnBtn = document.getElementById('toggle-pawn-btn');
+            const toggleKnightBtn = document.getElementById('toggle-knight-btn');
+            const flipBoardBtn = document.getElementById('flip-board-btn');
+            
+            let currentTable = pawnTable;
+            let isFlipped = false;
+
+            function renderBoard(table, flipped) {
+                boardContainer.innerHTML = '';
+                const boardIndices = Array.from({length: 64}, (_, i) => i);
+                if (flipped) {
+                    boardIndices.reverse();
+                }
+                
+                boardIndices.forEach(index => {
+                    const square = document.createElement('div');
+                    square.classList.add('board-square');
+                    const rank = Math.floor(index / 8);
+                    const file = index % 8;
+                    const mirroredIndex = (7 - rank) * 8 + file;
+                    square.textContent = table[mirroredIndex];
+                    boardContainer.appendChild(square);
+                });
+            }
+
+            togglePawnBtn.addEventListener('click', () => {
+                currentTable = pawnTable;
+                renderBoard(currentTable, isFlipped);
+            });
+            toggleKnightBtn.addEventListener('click', () => {
+                currentTable = knightTable;
+                renderBoard(currentTable, isFlipped);
+            });
+            flipBoardBtn.addEventListener('click', () => {
+                isFlipped = !isFlipped;
+                renderBoard(currentTable, isFlipped);
+            });
+
+            renderBoard(currentTable, isFlipped);
+
+        });
+    </script>
+</body>
+</html>

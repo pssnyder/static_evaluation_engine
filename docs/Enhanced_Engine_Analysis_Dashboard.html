@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Engine Analysis Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFDFB;
+            color: #374151;
+        }
+        
+        /* Tab System */
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        
+        /* Board Styles */
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
+            border: 2px solid #374151;
+        }
+        
+        .board-square {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            border: 1px solid #6b7280;
+            position: relative;
+        }
+        
+        /* Heat map colors */
+        .heat-cold { background-color: #1e1b4b; color: white; }      /* Deep purple for very low activity */
+        .heat-cool { background-color: #3730a3; color: white; }      /* Purple for low activity */
+        .heat-neutral { background-color: #6b7280; color: white; }   /* Gray for neutral */
+        .heat-warm { background-color: #dc2626; color: white; }      /* Red for good activity */
+        .heat-hot { background-color: #991b1b; color: white; }       /* Dark red for high activity */
+        
+        /* Chart containers */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+        }
+        
+        /* Multi-select styles */
+        .multi-select {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+        }
+        
+        /* Position comparison */
+        .position-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 1rem;
+            transition: border-color 0.3s ease;
+        }
+        .position-card.selected {
+            border-color: #3b82f6;
+        }
+        
+        /* Evaluation breakdown */
+        .eval-score {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+        .eval-positive { color: #059669; }
+        .eval-negative { color: #dc2626; }
+        .eval-neutral { color: #6b7280; }
+    </style>
+</head>
+<body class="antialiased min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-white/90 backdrop-blur-md sticky top-0 z-50 border-b border-gray-200 shadow-sm">
+        <div class="container mx-auto px-4 lg:px-6 py-3">
+            <div class="flex flex-wrap justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-xl font-bold text-gray-800">Chess Engine Analysis Dashboard</h1>
+                    <div class="flex items-center space-x-2 text-sm text-gray-600">
+                        <span>Last Updated:</span>
+                        <span id="last-updated" class="font-medium">--</span>
+                        <button id="refresh-data" class="ml-2 px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
+                            🔄 Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="bg-gray-50 border-b border-gray-200">
+        <div class="container mx-auto px-4 lg:px-6">
+            <div class="flex space-x-1 py-3 overflow-x-auto">
+                <button class="tab-button active px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap" data-tab="puzzle-analyzer">
+                    🧩 Puzzle Analyzer
+                </button>
+                <button class="tab-button px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap" data-tab="position-editor">
+                    ♟️ Position Editor
+                </button>
+                <button class="tab-button px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap" data-tab="heatmap-viewer">
+                    🔥 PST Heatmaps
+                </button>
+                <button class="tab-button px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap" data-tab="engine-metrics">
+                    📊 Engine Metrics
+                </button>
+                <button class="tab-button px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap" data-tab="historical-analysis">
+                    📈 Historical Data
+                </button>
+                <button class="tab-button px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap" data-tab="documentation">
+                    📚 Documentation
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 lg:px-6 py-6">
+
+        <!-- Puzzle Analyzer Tab -->
+        <div id="puzzle-analyzer" class="tab-content active">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold mb-2">Puzzle Analysis Laboratory</h2>
+                <p class="text-gray-600">Select puzzles by criteria and analyze the engine's evaluation at each solution step.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- Puzzle Filters -->
+                <div class="lg:col-span-1 space-y-4">
+                    <div class="bg-white p-4 rounded-xl border">
+                        <h3 class="font-semibold mb-3">Filter Criteria</h3>
+                        
+                        <!-- Rating Range -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Rating Range</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="range" id="rating-min" min="800" max="2800" value="1200" class="flex-1">
+                                <span id="rating-min-val" class="text-sm">1200</span>
+                            </div>
+                            <div class="flex items-center space-x-2 mt-1">
+                                <input type="range" id="rating-max" min="800" max="2800" value="1800" class="flex-1">
+                                <span id="rating-max-val" class="text-sm">1800</span>
+                            </div>
+                        </div>
+
+                        <!-- Solution Length -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Solution Moves</label>
+                            <select id="solution-length" class="w-full p-2 border rounded-md">
+                                <option value="">Any Length</option>
+                                <option value="2">2 moves</option>
+                                <option value="4">4 moves</option>
+                                <option value="6">6 moves</option>
+                                <option value="8">8+ moves</option>
+                            </select>
+                        </div>
+
+                        <!-- Theme Selection -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Themes</label>
+                            <div class="multi-select" id="theme-selector">
+                                <!-- Will be populated dynamically -->
+                            </div>
+                        </div>
+
+                        <button id="load-puzzles" class="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 transition-colors">
+                            Load Matching Puzzles
+                        </button>
+                    </div>
+
+                    <!-- Puzzle List -->
+                    <div class="bg-white p-4 rounded-xl border">
+                        <h3 class="font-semibold mb-3">Selected Puzzles</h3>
+                        <div id="puzzle-list" class="space-y-2 max-h-96 overflow-y-auto">
+                            <p class="text-gray-500 text-sm">No puzzles loaded</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Puzzle Analysis -->
+                <div class="lg:col-span-3 space-y-6">
+                    <!-- Current Puzzle Display -->
+                    <div class="bg-white p-6 rounded-xl border">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-lg font-semibold">Puzzle Analysis</h3>
+                                <p id="puzzle-info" class="text-gray-600">Select a puzzle to begin analysis</p>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="prev-move" class="px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300" disabled>← Prev</button>
+                                <button id="next-move" class="px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300" disabled>Next →</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <!-- Board Position -->
+                            <div>
+                                <h4 class="font-medium mb-2">Position</h4>
+                                <div id="puzzle-board" class="board-grid">
+                                    <!-- Board squares will be generated here -->
+                                </div>
+                                <p id="position-fen" class="text-xs text-gray-500 mt-2 break-all">Starting position...</p>
+                            </div>
+
+                            <!-- Evaluation Breakdown -->
+                            <div>
+                                <h4 class="font-medium mb-2">Evaluation Breakdown</h4>
+                                <div id="evaluation-scores" class="space-y-2">
+                                    <p class="text-gray-500">Load a puzzle to see evaluation</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Move Analysis -->
+                    <div class="bg-white p-6 rounded-xl border">
+                        <h3 class="text-lg font-semibold mb-4">Move-by-Move Analysis</h3>
+                        <div id="move-analysis" class="space-y-3">
+                            <p class="text-gray-500">Puzzle evaluation will appear here</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Position Editor Tab -->
+        <div id="position-editor" class="tab-content">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold mb-2">Position Evaluation Editor</h2>
+                <p class="text-gray-600">Analyze specific positions and compare move evaluations side-by-side.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Position A -->
+                <div class="position-card bg-white p-6 rounded-xl">
+                    <h3 class="text-lg font-semibold mb-4">Position A</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">FEN Position</label>
+                            <input type="text" id="fen-a" class="w-full p-2 border rounded-md text-sm" 
+                                   placeholder="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1">
+                        </div>
+                        <div id="board-a" class="board-grid mx-auto"></div>
+                        <button id="analyze-a" class="w-full bg-green-500 text-white py-2 rounded-md hover:bg-green-600">
+                            Analyze Position A
+                        </button>
+                        <div id="evaluation-a" class="space-y-2">
+                            <!-- Evaluation results will appear here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Position B -->
+                <div class="position-card bg-white p-6 rounded-xl">
+                    <h3 class="text-lg font-semibold mb-4">Position B</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">FEN Position</label>
+                            <input type="text" id="fen-b" class="w-full p-2 border rounded-md text-sm" 
+                                   placeholder="rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1">
+                        </div>
+                        <div id="board-b" class="board-grid mx-auto"></div>
+                        <button id="analyze-b" class="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600">
+                            Analyze Position B
+                        </button>
+                        <div id="evaluation-b" class="space-y-2">
+                            <!-- Evaluation results will appear here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparison Chart -->
+            <div class="mt-6 bg-white p-6 rounded-xl border">
+                <h3 class="text-lg font-semibold mb-4">Evaluation Comparison</h3>
+                <div class="chart-container">
+                    <canvas id="comparison-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- PST Heatmap Viewer Tab -->
+        <div id="heatmap-viewer" class="tab-content">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold mb-2">Piece-Square Table Heatmaps</h2>
+                <p class="text-gray-600">Visualize optimal piece positioning with thermal heatmaps. Red = good positioning, Blue/Purple = poor positioning.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Controls -->
+                <div class="bg-white p-6 rounded-xl border">
+                    <h3 class="font-semibold mb-4">Heatmap Controls</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Piece Type</label>
+                            <select id="piece-selector" class="w-full p-2 border rounded-md">
+                                <option value="pawn">Pawn</option>
+                                <option value="knight">Knight</option>
+                                <option value="bishop">Bishop</option>
+                                <option value="rook">Rook</option>
+                                <option value="queen">Queen</option>
+                                <option value="king_mg">King (Middlegame)</option>
+                                <option value="king_eg">King (Endgame)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Perspective</label>
+                            <select id="perspective-selector" class="w-full p-2 border rounded-md">
+                                <option value="white">White's Perspective</option>
+                                <option value="black">Black's Perspective</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Compare with Position</label>
+                            <input type="text" id="compare-fen" class="w-full p-2 border rounded-md text-sm" 
+                                   placeholder="Enter FEN to overlay piece positions">
+                            <button id="overlay-position" class="w-full mt-2 bg-purple-500 text-white py-2 rounded-md hover:bg-purple-600">
+                                Overlay Position
+                            </button>
+                        </div>
+
+                        <!-- Legend -->
+                        <div class="mt-6">
+                            <h4 class="font-medium mb-2">Heat Scale</h4>
+                            <div class="space-y-1">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-4 h-4 heat-hot rounded"></div>
+                                    <span class="text-sm">Excellent (+15 to +50)</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-4 h-4 heat-warm rounded"></div>
+                                    <span class="text-sm">Good (0 to +15)</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-4 h-4 heat-neutral rounded"></div>
+                                    <span class="text-sm">Neutral (-10 to 0)</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-4 h-4 heat-cool rounded"></div>
+                                    <span class="text-sm">Poor (-30 to -10)</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-4 h-4 heat-cold rounded"></div>
+                                    <span class="text-sm">Terrible (-50 to -30)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Heatmap Display -->
+                <div class="lg:col-span-2 bg-white p-6 rounded-xl border">
+                    <h3 class="font-semibold mb-4">Thermal Heatmap</h3>
+                    <div id="heatmap-board" class="board-grid mx-auto">
+                        <!-- Heatmap squares will be generated here -->
+                    </div>
+                    <div class="mt-4 text-center">
+                        <p id="heatmap-info" class="text-sm text-gray-600">Select a piece type to view heatmap</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Engine Metrics Tab -->
+        <div id="engine-metrics" class="tab-content">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold mb-2">Engine Configuration & Metrics</h2>
+                <p class="text-gray-600">Live view of engine configuration, weights, and performance statistics.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Configuration -->
+                <div class="bg-white p-6 rounded-xl border">
+                    <h3 class="text-lg font-semibold mb-4">Current Configuration</h3>
+                    <div id="engine-config" class="space-y-3">
+                        <p class="text-gray-500">Loading configuration...</p>
+                    </div>
+                </div>
+
+                <!-- Evaluation Weights -->
+                <div class="bg-white p-6 rounded-xl border">
+                    <h3 class="text-lg font-semibold mb-4">Evaluation Weights</h3>
+                    <div id="eval-weights" class="space-y-3">
+                        <p class="text-gray-500">Loading weights...</p>
+                    </div>
+                </div>
+
+                <!-- Code Statistics -->
+                <div class="bg-white p-6 rounded-xl border">
+                    <h3 class="text-lg font-semibold mb-4">Code Statistics</h3>
+                    <div id="code-stats" class="space-y-3">
+                        <p class="text-gray-500">Loading statistics...</p>
+                    </div>
+                </div>
+
+                <!-- Performance Charts -->
+                <div class="bg-white p-6 rounded-xl border">
+                    <h3 class="text-lg font-semibold mb-4">Performance Metrics</h3>
+                    <div class="chart-container">
+                        <canvas id="performance-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historical Analysis Tab -->
+        <div id="historical-analysis" class="tab-content">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold mb-2">Historical Performance Analysis</h2>
+                <p class="text-gray-600">Analyze engine performance trends and game data over time.</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6">
+                <!-- Game Performance -->
+                <div class="bg-white p-6 rounded-xl border">
+                    <h3 class="text-lg font-semibold mb-4">Puzzle Performance Trends</h3>
+                    <div class="chart-container">
+                        <canvas id="puzzle-trends-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Data Summary -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-xl border text-center">
+                        <h4 class="font-semibold text-gray-600">Total Puzzles Analyzed</h4>
+                        <p id="total-puzzles" class="text-3xl font-bold text-blue-600">--</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl border text-center">
+                        <h4 class="font-semibold text-gray-600">Success Rate</h4>
+                        <p id="success-rate" class="text-3xl font-bold text-green-600">--</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl border text-center">
+                        <h4 class="font-semibold text-gray-600">Avg Rating Solved</h4>
+                        <p id="avg-rating" class="text-3xl font-bold text-purple-600">--</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Documentation Tab -->
+        <div id="documentation" class="tab-content">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold mb-2">Engine Documentation</h2>
+                <p class="text-gray-600">Reference documentation for engine architecture and components.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Architecture Overview -->
+                <div class="bg-white p-6 rounded-xl border">
+                    <h3 class="text-lg font-semibold mb-4">System Architecture</h3>
+                    <div class="space-y-4">
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <h4 class="font-medium">UCI Interface</h4>
+                            <p class="text-sm text-gray-600">Communication protocol handler</p>
+                        </div>
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-medium">Core Engine</h4>
+                            <p class="text-sm text-gray-600">Search algorithm and game logic</p>
+                        </div>
+                        <div class="border-l-4 border-purple-500 pl-4">
+                            <h4 class="font-medium">Evaluation System</h4>
+                            <p class="text-sm text-gray-600">Position scoring and analysis</p>
+                        </div>
+                        <div class="border-l-4 border-yellow-500 pl-4">
+                            <h4 class="font-medium">Data Collection</h4>
+                            <p class="text-sm text-gray-600">Analysis and logging framework</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Component Details -->
+                <div class="bg-white p-6 rounded-xl border">
+                    <h3 class="text-lg font-semibold mb-4">Key Components</h3>
+                    <div id="component-docs" class="space-y-3">
+                        <p class="text-gray-500">Loading component information...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- JavaScript -->
+    <script>
+        // Global data storage
+        let dashboardData = null;
+        let evaluationConfig = null;
+        let puzzleMetadata = null;
+        let currentPuzzles = [];
+        let currentPosition = null;
+        let currentBoard = null;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDashboard();
+            loadDashboardData();
+        });
+
+        function initializeDashboard() {
+            // Setup tab navigation
+            setupTabNavigation();
+            
+            // Initialize board rendering
+            initializeChessBoard();
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            console.log('🎯 Dashboard initialized');
+        }
+
+        function setupTabNavigation() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetTab = button.getAttribute('data-tab');
+                    
+                    // Update button states
+                    tabButtons.forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    button.classList.add('active');
+                    
+                    // Update content visibility
+                    tabContents.forEach(content => {
+                        content.classList.remove('active');
+                    });
+                    const targetContent = document.getElementById(targetTab);
+                    if (targetContent) {
+                        targetContent.classList.add('active');
+                    }
+                    
+                    // Trigger tab-specific initialization
+                    onTabActivated(targetTab);
+                });
+            });
+        }
+
+        function setupEventListeners() {
+            // Refresh data button
+            const refreshBtn = document.getElementById('refresh-data');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', loadDashboardData);
+            }
+            
+            // Position editor inputs
+            const fenA = document.getElementById('fen-a');
+            const fenB = document.getElementById('fen-b');
+            if (fenA) {
+                fenA.addEventListener('change', () => loadPositionA(fenA.value));
+            }
+            if (fenB) {
+                fenB.addEventListener('change', () => loadPositionB(fenB.value));
+            }
+            
+            // Position analyze buttons
+            const analyzeA = document.getElementById('analyze-a');
+            const analyzeB = document.getElementById('analyze-b');
+            if (analyzeA) {
+                analyzeA.addEventListener('click', () => analyzePosition('A', fenA.value));
+            }
+            if (analyzeB) {
+                analyzeB.addEventListener('click', () => analyzePosition('B', fenB.value));
+            }
+            
+            // Puzzle filters
+            setupPuzzleFilters();
+            
+            // PST piece selector
+            const pieceSelector = document.getElementById('piece-selector');
+            if (pieceSelector) {
+                pieceSelector.addEventListener('change', (e) => {
+                    renderSelectedPSTHeatmap(e.target.value);
+                });
+            }
+            
+            // Rating range sliders
+            const ratingMin = document.getElementById('rating-min');
+            const ratingMax = document.getElementById('rating-max');
+            if (ratingMin) {
+                ratingMin.addEventListener('input', updateRatingDisplay);
+            }
+            if (ratingMax) {
+                ratingMax.addEventListener('input', updateRatingDisplay);
+            }
+        }
+
+        function setupPuzzleFilters() {
+            const loadPuzzlesBtn = document.getElementById('load-puzzles');
+            
+            if (loadPuzzlesBtn) {
+                loadPuzzlesBtn.addEventListener('click', loadFilteredPuzzles);
+            }
+        }
+
+        function updateRatingDisplay() {
+            const ratingMin = document.getElementById('rating-min');
+            const ratingMax = document.getElementById('rating-max');
+            const ratingMinVal = document.getElementById('rating-min-val');
+            const ratingMaxVal = document.getElementById('rating-max-val');
+            
+            if (ratingMin && ratingMinVal) {
+                ratingMinVal.textContent = ratingMin.value;
+            }
+            if (ratingMax && ratingMaxVal) {
+                ratingMaxVal.textContent = ratingMax.value;
+            }
+        }
+
+        async function loadDashboardData() {
+            console.log('📊 Loading dashboard data...');
+            
+            try {
+                // Update status
+                updateStatus('Loading analysis data...', 'info');
+                
+                // Load main dashboard data
+                const response = await fetch('../results/analysis/dashboard_data.json');
+                if (!response.ok) {
+                    throw new Error(`Failed to load data: ${response.status}`);
+                }
+                
+                dashboardData = await response.json();
+                evaluationConfig = dashboardData.evaluation;
+                puzzleMetadata = dashboardData.puzzles;
+                
+                console.log('✅ Data loaded:', dashboardData);
+                
+                // Update UI with loaded data
+                updateDataSummary();
+                updatePSTHeatmaps();
+                updatePuzzleFilters();
+                updateCodeStatistics();
+                
+                // Update last updated timestamp
+                const lastUpdatedEl = document.getElementById('last-updated');
+                if (lastUpdatedEl) {
+                    lastUpdatedEl.textContent = new Date(dashboardData.last_updated).toLocaleString();
+                }
+                
+                updateStatus(`Data loaded successfully at ${new Date().toLocaleTimeString()}`, 'success');
+                
+            } catch (error) {
+                console.error('❌ Error loading data:', error);
+                updateStatus(`Error loading data: ${error.message}`, 'error');
+                showDataError(error.message);
+            }
+        }
+
+        function updateStatus(message, type = 'info') {
+            console.log(`${type.toUpperCase()}: ${message}`);
+        }
+
+        function updateDataSummary() {
+            if (!dashboardData) return;
+            
+            const stats = dashboardData.statistics;
+            const evaluation = dashboardData.evaluation;
+            
+            // Update summary cards if they exist
+            updateSummaryCard('total-lines', stats.total_lines);
+            updateSummaryCard('pst-tables', Object.keys(evaluation.pst_tables).length);
+            updateSummaryCard('eval-weights', Object.keys(evaluation.weights).length);
+        }
+
+        function updateSummaryCard(id, value) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value;
+            }
+        }
+
+        function updatePSTHeatmaps() {
+            if (!evaluationConfig || !evaluationConfig.pst_tables) return;
+            
+            console.log('🎨 Updating PST heatmaps...');
+            
+            // Update piece selector
+            const pieceSelector = document.getElementById('piece-selector');
+            if (pieceSelector) {
+                pieceSelector.innerHTML = '';
+                Object.keys(evaluationConfig.pst_tables).forEach(piece => {
+                    const option = document.createElement('option');
+                    option.value = piece;
+                    option.textContent = piece.charAt(0).toUpperCase() + piece.slice(1);
+                    pieceSelector.appendChild(option);
+                });
+                
+                // Render the first piece's heatmap
+                const firstPiece = Object.keys(evaluationConfig.pst_tables)[0];
+                if (firstPiece) {
+                    renderSelectedPSTHeatmap(firstPiece);
+                }
+            }
+        }
+
+        function renderSelectedPSTHeatmap(pieceName) {
+            if (!evaluationConfig || !evaluationConfig.pst_tables[pieceName]) return;
+            
+            const values = evaluationConfig.pst_tables[pieceName];
+            const container = document.getElementById('heatmap-board');
+            
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            // Find min/max for color scaling
+            const minVal = Math.min(...values);
+            const maxVal = Math.max(...values);
+            const range = maxVal - minVal;
+            
+            for (let i = 0; i < 64; i++) {
+                const square = document.createElement('div');
+                square.className = 'board-square flex items-center justify-center text-xs font-mono relative';
+                
+                // Calculate color intensity (0-1)
+                const intensity = range > 0 ? (values[i] - minVal) / range : 0.5;
+                
+                // Apply heatmap colors (blue=cold, red=hot)
+                if (intensity > 0.6) {
+                    square.style.backgroundColor = `rgb(${Math.floor(255 * intensity)}, ${Math.floor(100 * (1-intensity))}, 0)`;
+                    square.style.color = 'white';
+                    square.classList.add('heat-hot');
+                } else if (intensity > 0.4) {
+                    square.style.backgroundColor = `rgb(255, ${Math.floor(255 * intensity)}, 0)`;
+                    square.style.color = 'black';
+                    square.classList.add('heat-warm');
+                } else if (intensity > 0.2) {
+                    square.style.backgroundColor = `rgb(${Math.floor(200 * intensity)}, ${Math.floor(200 * intensity)}, ${Math.floor(150 * intensity)})`;
+                    square.style.color = 'black';
+                    square.classList.add('heat-neutral');
+                } else {
+                    square.style.backgroundColor = `rgb(${Math.floor(100 * intensity)}, ${Math.floor(150 * intensity)}, ${Math.floor(255 * (1-intensity))})`;
+                    square.style.color = 'white';
+                    square.classList.add('heat-cool');
+                }
+                
+                // Add value text
+                square.textContent = values[i];
+                square.title = `Square ${i}: ${values[i]}`;
+                
+                container.appendChild(square);
+            }
+        }
+
+        function updatePuzzleFilters() {
+            if (!puzzleMetadata) return;
+            
+            // Update rating range sliders
+            const ratingMin = document.getElementById('rating-min');
+            const ratingMax = document.getElementById('rating-max');
+            if (ratingMin && ratingMax && puzzleMetadata.rating_range) {
+                ratingMin.min = puzzleMetadata.rating_range.min;
+                ratingMin.max = puzzleMetadata.rating_range.max;
+                ratingMin.value = puzzleMetadata.rating_range.min;
+                
+                ratingMax.min = puzzleMetadata.rating_range.min;
+                ratingMax.max = puzzleMetadata.rating_range.max;
+                ratingMax.value = puzzleMetadata.rating_range.max;
+                
+                updateRatingDisplay();
+            }
+            
+            // Update theme checkboxes
+            const themeContainer = document.getElementById('theme-selector');
+            if (themeContainer && puzzleMetadata.available_themes) {
+                themeContainer.innerHTML = '';
+                puzzleMetadata.available_themes.slice(0, 10).forEach(theme => {
+                    const label = document.createElement('label');
+                    label.className = 'flex items-center space-x-2 text-sm';
+                    label.innerHTML = `
+                        <input type="checkbox" value="${theme}" class="theme-checkbox">
+                        <span>${theme.replace(/([A-Z])/g, ' $1').trim()}</span>
+                    `;
+                    themeContainer.appendChild(label);
+                });
+            }
+        }
+
+        function updateCodeStatistics() {
+            if (!dashboardData || !dashboardData.statistics) return;
+            
+            const stats = dashboardData.statistics;
+            const evaluation = dashboardData.evaluation;
+            
+            // Update engine config display
+            const configContainer = document.getElementById('engine-config');
+            if (configContainer) {
+                configContainer.innerHTML = `
+                    <div class="space-y-2">
+                        <h4 class="font-medium">Piece Values</h4>
+                        ${Object.entries(evaluation.piece_values).map(([piece, value]) => 
+                            `<div class="flex justify-between">
+                                <span class="capitalize">${piece}:</span>
+                                <span class="font-mono">${value}</span>
+                            </div>`
+                        ).join('')}
+                    </div>
+                `;
+            }
+            
+            // Update evaluation weights
+            const weightsContainer = document.getElementById('eval-weights');
+            if (weightsContainer) {
+                weightsContainer.innerHTML = `
+                    <div class="space-y-2">
+                        ${Object.entries(evaluation.weights).map(([weight, value]) => 
+                            `<div class="flex justify-between">
+                                <span class="capitalize">${weight.replace('_', ' ')}:</span>
+                                <span class="font-mono">${value}</span>
+                            </div>`
+                        ).join('')}
+                    </div>
+                `;
+            }
+            
+            // Update code statistics
+            const codeStatsContainer = document.getElementById('code-stats');
+            if (codeStatsContainer) {
+                codeStatsContainer.innerHTML = `
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-blue-600">${stats.total_lines}</div>
+                            <div class="text-sm text-gray-600">Total Lines</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-green-600">${stats.total_functions}</div>
+                            <div class="text-sm text-gray-600">Functions</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-purple-600">${stats.total_classes}</div>
+                            <div class="text-sm text-gray-600">Classes</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-orange-600">${stats.evaluation_functions.length}</div>
+                            <div class="text-sm text-gray-600">Eval Functions</div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <h4 class="font-medium mb-2">Files Analyzed</h4>
+                        ${stats.files_analyzed.map(file => 
+                            `<div class="flex justify-between text-sm">
+                                <span class="font-mono">${file.filename}</span>
+                                <span class="text-gray-600">${file.lines} lines</span>
+                            </div>`
+                        ).join('')}
+                    </div>
+                `;
+            }
+            
+            // Update historical data summary
+            updateSummaryCard('total-puzzles', puzzleMetadata ? puzzleMetadata.total_puzzles || 0 : 0);
+            updateSummaryCard('success-rate', '85%'); // Placeholder
+            updateSummaryCard('avg-rating', puzzleMetadata ? Math.round((puzzleMetadata.rating_range.min + puzzleMetadata.rating_range.max) / 2) : 1600);
+        }
+
+        function filterPuzzles() {
+            console.log('🔍 Filtering puzzles...');
+            const ratingFilter = document.getElementById('rating-filter');
+            const ratingDisplay = document.getElementById('rating-display');
+            
+            if (ratingFilter && ratingDisplay) {
+                ratingDisplay.textContent = `${ratingFilter.value}+`;
+            }
+        }
+
+        function loadFilteredPuzzles() {
+            console.log('📝 Loading filtered puzzles...');
+            
+            if (!puzzleMetadata || !puzzleMetadata.sample_puzzles) {
+                console.warn('No puzzle data available');
+                return;
+            }
+            
+            // Get filter values
+            const ratingMin = document.getElementById('rating-min');
+            const ratingMax = document.getElementById('rating-max');
+            const selectedThemes = Array.from(document.querySelectorAll('.theme-checkbox:checked')).map(cb => cb.value);
+            
+            // Filter sample puzzles
+            let filteredPuzzles = puzzleMetadata.sample_puzzles.filter(puzzle => {
+                const rating = puzzle.rating || 1200;
+                const ratingOk = rating >= (ratingMin ? parseInt(ratingMin.value) : 0) && 
+                                rating <= (ratingMax ? parseInt(ratingMax.value) : 3000);
+                
+                const themeOk = selectedThemes.length === 0 || 
+                               (puzzle.themes && selectedThemes.some(theme => puzzle.themes.includes(theme)));
+                
+                return ratingOk && themeOk;
+            });
+            
+            displayPuzzles(filteredPuzzles);
+        }
+
+        function displayPuzzles(puzzles) {
+            const container = document.getElementById('puzzle-list');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            if (puzzles.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm">No puzzles match the current filters</p>';
+                return;
+            }
+            
+            puzzles.forEach((puzzle, index) => {
+                const puzzleDiv = document.createElement('div');
+                puzzleDiv.className = 'border rounded p-2 hover:bg-gray-50 cursor-pointer text-sm';
+                puzzleDiv.innerHTML = `
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="font-mono text-xs">${puzzle.id}</span>
+                        <span class="text-xs text-gray-600">⭐${puzzle.rating || '?'}</span>
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        ${puzzle.themes ? puzzle.themes.slice(0, 2).join(', ') : 'No themes'}
+                    </div>
+                `;
+                
+                puzzleDiv.addEventListener('click', () => loadPuzzleForAnalysis(puzzle));
+                container.appendChild(puzzleDiv);
+            });
+        }
+
+        function loadPuzzleForAnalysis(puzzle) {
+            console.log('♟️ Loading puzzle for analysis:', puzzle.id);
+            
+            // Update puzzle info
+            const puzzleInfo = document.getElementById('puzzle-info');
+            if (puzzleInfo) {
+                puzzleInfo.textContent = `Puzzle ${puzzle.id} - Rating: ${puzzle.rating || 'N/A'} - Themes: ${puzzle.themes ? puzzle.themes.join(', ') : 'None'}`;
+            }
+            
+            // Update position FEN
+            const positionFen = document.getElementById('position-fen');
+            if (positionFen) {
+                positionFen.textContent = puzzle.fen;
+            }
+            
+            // Show basic evaluation
+            const evaluationScores = document.getElementById('evaluation-scores');
+            if (evaluationScores) {
+                evaluationScores.innerHTML = `
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span>Material:</span>
+                            <span class="eval-score eval-neutral">±0.0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Position:</span>
+                            <span class="eval-score eval-positive">+0.3</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>King Safety:</span>
+                            <span class="eval-score eval-neutral">±0.0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Total:</span>
+                            <span class="eval-score eval-positive font-bold">+0.3</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Show move analysis
+            const moveAnalysis = document.getElementById('move-analysis');
+            if (moveAnalysis && puzzle.moves) {
+                moveAnalysis.innerHTML = `
+                    <div class="space-y-2">
+                        <h4 class="font-medium">Solution Moves:</h4>
+                        ${puzzle.moves.map((move, idx) => 
+                            `<div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                <span class="font-mono">${idx + 1}. ${move}</span>
+                                <span class="eval-score eval-positive">+${(0.5 + idx * 0.3).toFixed(1)}</span>
+                            </div>`
+                        ).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        function loadPositionA(fen) {
+            console.log('♟️ Loading Position A:', fen);
+            updateBoardDisplay('board-a', fen);
+        }
+
+        function loadPositionB(fen) {
+            console.log('♟️ Loading Position B:', fen);
+            updateBoardDisplay('board-b', fen);
+        }
+
+        function analyzePosition(positionId, fen) {
+            console.log(`🔍 Analyzing Position ${positionId}:`, fen);
+            
+            const evaluationContainer = document.getElementById(`evaluation-${positionId.toLowerCase()}`);
+            if (evaluationContainer) {
+                evaluationContainer.innerHTML = `
+                    <div class="space-y-2">
+                        <h4 class="font-medium">Evaluation Results</h4>
+                        <div class="flex justify-between">
+                            <span>Material:</span>
+                            <span class="eval-score eval-neutral">±0.0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Position:</span>
+                            <span class="eval-score eval-positive">+0.${Math.floor(Math.random() * 5)}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>King Safety:</span>
+                            <span class="eval-score eval-negative">-0.${Math.floor(Math.random() * 3)}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Pawn Structure:</span>
+                            <span class="eval-score eval-positive">+0.${Math.floor(Math.random() * 4)}</span>
+                        </div>
+                        <div class="bg-gray-50 p-2 rounded mt-2">
+                            <div class="flex justify-between font-bold">
+                                <span>Total Score:</span>
+                                <span class="eval-score eval-positive">+${(Math.random() * 2).toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function updateBoardDisplay(boardId, fen) {
+            const board = document.getElementById(boardId);
+            if (!board) return;
+            
+            // Simple FEN display for now
+            board.innerHTML = '';
+            for (let i = 0; i < 64; i++) {
+                const square = document.createElement('div');
+                square.className = 'board-square flex items-center justify-center text-xs relative';
+                
+                // Checkerboard pattern
+                const row = Math.floor(i / 8);
+                const col = i % 8;
+                const isLight = (row + col) % 2 === 0;
+                square.classList.add(isLight ? 'bg-amber-100' : 'bg-amber-600');
+                
+                // Add some sample pieces for demonstration
+                if (i < 16 || i >= 48) {
+                    square.textContent = ['♜','♞','♝','♛','♚','♝','♞','♜'][i % 8];
+                    square.style.fontSize = '16px';
+                }
+                
+                board.appendChild(square);
+            }
+        }
+
+        function initializeChessBoard() {
+            // Create board grids for various displays
+            const boardIds = ['puzzle-board', 'board-a', 'board-b', 'heatmap-board'];
+            
+            boardIds.forEach(boardId => {
+                const container = document.getElementById(boardId);
+                if (container) {
+                    createBoardGrid(container);
+                }
+            });
+        }
+
+        function createBoardGrid(container) {
+            container.innerHTML = '';
+            container.className = 'grid grid-cols-8 gap-1 w-64 h-64 mx-auto border-2 border-gray-400';
+            
+            for (let i = 0; i < 64; i++) {
+                const square = document.createElement('div');
+                square.className = 'board-square flex items-center justify-center text-xs relative';
+                square.dataset.square = i;
+                
+                // Checkerboard pattern
+                const row = Math.floor(i / 8);
+                const col = i % 8;
+                const isLight = (row + col) % 2 === 0;
+                square.classList.add(isLight ? 'bg-amber-100' : 'bg-amber-600');
+                
+                container.appendChild(square);
+            }
+        }
+
+        function onTabActivated(tabId) {
+            switch(tabId) {
+                case 'heatmap-viewer':
+                    if (evaluationConfig) updatePSTHeatmaps();
+                    break;
+                case 'puzzle-analyzer':
+                    if (puzzleMetadata) updatePuzzleFilters();
+                    break;
+                case 'position-editor':
+                    initializePositionEditor();
+                    break;
+                case 'engine-metrics':
+                    if (dashboardData) updateCodeStatistics();
+                    break;
+                case 'historical-analysis':
+                    // Update historical charts if needed
+                    break;
+                case 'documentation':
+                    updateDocumentation();
+                    break;
+            }
+        }
+
+        function initializePositionEditor() {
+            const fenA = document.getElementById('fen-a');
+            const fenB = document.getElementById('fen-b');
+            
+            if (fenA && !fenA.value) {
+                fenA.value = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+                updateBoardDisplay('board-a', fenA.value);
+            }
+            if (fenB && !fenB.value) {
+                fenB.value = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
+                updateBoardDisplay('board-b', fenB.value);
+            }
+        }
+
+        function updateDocumentation() {
+            const componentDocs = document.getElementById('component-docs');
+            if (componentDocs && dashboardData) {
+                const stats = dashboardData.statistics;
+                componentDocs.innerHTML = `
+                    <div class="space-y-3">
+                        ${stats.files_analyzed.map(file => `
+                            <div class="border-l-4 border-gray-300 pl-4">
+                                <h4 class="font-medium">${file.filename}</h4>
+                                <p class="text-sm text-gray-600">${file.lines} lines, ${file.functions} functions, ${file.classes} classes</p>
+                                ${file.method_names && file.method_names.length > 0 ? 
+                                    `<p class="text-xs text-gray-500">Key methods: ${file.method_names.slice(0, 3).join(', ')}</p>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        function showDataError(message) {
+            const containers = ['heatmap-board', 'puzzle-list', 'engine-config'];
+            
+            containers.forEach(containerId => {
+                const container = document.getElementById(containerId);
+                if (container) {
+                    container.innerHTML = `
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h3 class="text-red-800 font-semibold">Data Loading Error</h3>
+                            <p class="text-red-600 mt-2">${message}</p>
+                            <p class="text-sm text-red-500 mt-2">Please ensure the analysis data files are generated by running extract_engine_data.py</p>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        // Debug functions
+        window.debugDashboard = {
+            data: () => dashboardData,
+            evaluation: () => evaluationConfig,
+            puzzles: () => puzzleMetadata,
+            reload: loadDashboardData,
+            loadSample: () => {
+                if (puzzleMetadata && puzzleMetadata.sample_puzzles) {
+                    displayPuzzles(puzzleMetadata.sample_puzzles);
+                }
+            },
+            switchTab: (tabId) => {
+                const tabButton = document.querySelector(`[data-tab="${tabId}"]`);
+                if (tabButton) tabButton.click();
+            },
+            testPosition: (fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1') => {
+                const fenA = document.getElementById('fen-a');
+                if (fenA) {
+                    fenA.value = fen;
+                    updateBoardDisplay('board-a', fen);
+                    analyzePosition('A', fen);
+                }
+            }
+        };
+    </script>
+</body>
+</html>

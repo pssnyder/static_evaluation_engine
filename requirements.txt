@@ -1,0 +1,21 @@
+# Cece Chess Engine v1.1 Dependencies
+# Core chess library - required for all functionality
+python-chess>=1.999
+
+# Optional build dependencies (not needed for runtime)
+# pyinstaller>=5.0  # For building executable distributions
+# setuptools>=65.0  # For package management
+
+# Runtime Requirements
+# - Python 3.8 or higher
+# - Windows/Linux/MacOS compatible
+# - No additional system dependencies
+
+# Installation:
+# pip install -r requirements.txt
+
+# For development:
+# pip install python-chess pyinstaller
+
+# Note: This engine is designed to be lightweight with minimal dependencies
+# The core engine only requires python-chess for chess logic and validation
