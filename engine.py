@@ -66,20 +66,32 @@ class ChessEngine:
         # Engine state
         self.board = chess.Board()
         
-        # Engine metadata
+        # Engine metadata - Updated to v1.3
         self.info = {
             'name': 'Cece',
-            'version': '1.1',
+            'version': '1.3',
             'author': 'Pat Snyder',
-            'description': 'Hybrid engine focusing on custom evaluation and analysis',
+            'description': 'Hybrid engine with v1.3 dynamic evaluation and tactical improvements',
             'license': 'GPL-3.0',
             'attribution': 'Built on python-chess by Niklas Fiekas'
         }
         
-        # Search parameters
-        self.search_depth = 10
+        # v1.3 Search parameters - improved for better tactical play
+        self.search_depth = 6          # Increased from 3 for better tactics
+        self.max_depth = 10            # Allow deeper search when time permits  
+        self.min_depth = 4             # Never search less than 4 ply
         self.time_limit = 5.0
         self.nodes_limit = 1000000
+        
+        # v1.3 Time management parameters
+        self.time_buffer_ratio = 0.1    # Reserve 10% of time
+        self.move_time_opening = 0.08   # 8% of time in opening
+        self.move_time_middlegame = 0.04 # 4% of time in middlegame  
+        self.move_time_endgame = 0.06   # 6% of time in endgame
+        
+        # v1.3 Game phase tracking
+        self.opening_move_limit = 12
+        self.endgame_piece_threshold = 14
         
         # Performance tracking
         self.search_stats = SearchInfo(0, 0, 0, [], 0, 0, 0, 0)
@@ -352,6 +364,33 @@ class ChessEngine:
         
         return sorted(moves, key=move_score, reverse=True)
     
+    def _calculate_move_time(self, remaining_time: float, increment: float, move_number: int) -> float:
+        """
+        v1.3 adaptive time management - calculate appropriate time allocation for a move.
+        """
+        # Reserve some time for final moves (10% buffer)
+        available_time = remaining_time * (1.0 - self.time_buffer_ratio)
+        
+        # Add increment to available time (we'll get it back)
+        available_time += increment
+        
+        # Determine game phase
+        if move_number <= self.opening_move_limit:
+            phase_percentage = self.move_time_opening
+        elif len(self.board.piece_map()) < self.endgame_piece_threshold:
+            phase_percentage = self.move_time_endgame
+        else:
+            phase_percentage = self.move_time_middlegame
+        
+        # Calculate time to spend
+        move_time = available_time * phase_percentage
+        
+        # Minimum and maximum bounds
+        min_time = 0.5  # At least 0.5 seconds
+        max_time = min(30.0, remaining_time * 0.3)  # At most 30s or 30% of remaining
+        
+        return max(min_time, min(move_time, max_time))
+    
     # === User-Friendly Interface Methods ===
     
     def get_best_move(self, depth: Optional[int] = None, 
@@ -467,20 +506,31 @@ class ChessEngine:
     
     def tune_evaluation(self, parameter: str, value: float):
         """
-        Tune evaluation parameters for experimentation.
+        Tune evaluation parameters for experimentation - updated for v1.3.
         """
-        if parameter in self.evaluator.weights:
-            old_value = self.evaluator.weights[parameter]
-            self.evaluator.weights[parameter] = value
-            print(f"Tuned {parameter}: {old_value} -> {value}")
-        elif parameter in self.evaluator.pattern_bonuses:
-            old_value = self.evaluator.pattern_bonuses[parameter]
-            self.evaluator.pattern_bonuses[parameter] = int(value)
-            print(f"Tuned {parameter}: {old_value} -> {int(value)}")
+        # v1.3 parameters that can be tuned
+        v13_params = {
+            'bishop_pair_bonus': 'bishop_pair_bonus',
+            'single_bishop_penalty': 'single_bishop_penalty', 
+            'early_queen_penalty': 'early_queen_penalty',
+            'minor_piece_unmoved_bonus': 'minor_piece_unmoved_bonus',
+            'king_safety_zone_bonus': 'king_safety_zone_bonus',
+            'exposed_king_penalty': 'exposed_king_penalty',
+            'open_file_bonus': 'open_file_bonus',
+            'tension_bonus': 'tension_bonus'
+        }
+        
+        if parameter in v13_params:
+            attr_name = v13_params[parameter]
+            if hasattr(self.evaluator, attr_name):
+                old_value = getattr(self.evaluator, attr_name)
+                setattr(self.evaluator, attr_name, int(value))
+                print(f"Tuned {parameter}: {old_value} -> {int(value)}")
+            else:
+                print(f"Parameter {parameter} not found in evaluator")
         else:
             print(f"Unknown parameter: {parameter}")
-            print("Available weights:", list(self.evaluator.weights.keys()))
-            print("Available patterns:", list(self.evaluator.pattern_bonuses.keys()))
+            print("Available v1.3 parameters:", list(v13_params.keys()))
     
     def get_evaluation_explanation(self) -> str:
         """Get human-readable explanation of position evaluation."""

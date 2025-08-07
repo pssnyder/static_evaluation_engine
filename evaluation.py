@@ -24,18 +24,43 @@ class Evaluation:
     """
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize evaluation system."""
-        # Piece values - used across multiple evaluation functions
+        """Initialize evaluation system with v1.3 enhancements."""
+        # Base piece values (in centipawns) - v1.3 dynamic values
         self.piece_values = {
             chess.PAWN: 100,
-            chess.KNIGHT: 320,
-            chess.BISHOP: 330,
+            chess.KNIGHT: 300,    # Static baseline for comparison
+            chess.BISHOP: 275,    # Lower base, gets bonus when paired
             chess.ROOK: 500,
             chess.QUEEN: 900,
             chess.KING: 20000
         }
         
-        # Initialize PST tables
+        # v1.3 Strategic bonuses/penalties (in centipawns)
+        self.bishop_pair_bonus = 25      # +0.25 pawns when both bishops present
+        self.single_bishop_penalty = 25  # -0.25 pawns when only one bishop
+        
+        # v1.3 Development penalties
+        self.same_piece_twice_penalty = 50   # -0.50 pawns for moving same piece twice
+        self.early_queen_penalty = 75        # -0.75 pawns for early queen moves
+        self.minor_piece_unmoved_bonus = 30  # +0.30 pawns per undeveloped minor piece
+        
+        # v1.3 King safety zones and bonuses
+        self.king_safety_zone_bonus = 20    # +0.20 pawns per protected square
+        self.exposed_king_penalty = 150     # -1.50 pawns for exposed king
+        
+        # v1.3 Tal-style tactical preferences
+        self.open_file_bonus = 40           # +0.40 pawns for rook on open file
+        self.tension_bonus = 15             # +0.15 pawns per tension point
+        
+        # v1.3 Game phase tracking
+        self.opening_move_threshold = 12     # Moves 1-12 = opening
+        self.endgame_piece_threshold = 14    # < 14 pieces = endgame
+        
+        # v1.3 Move tracking for development analysis
+        self.piece_move_count = {}
+        self.developed_pieces = set()
+        
+        # Initialize enhanced PST tables
         self._init_piece_square_tables()
     
     def evaluate(self, board: chess.Board) -> int:
@@ -125,10 +150,13 @@ class Evaluation:
 # ============================================================================
 
     def _evaluate_material(self, board: chess.Board) -> int:
-        """Basic material balance evaluation."""
+        """Enhanced material balance evaluation with v1.3 dynamic piece values."""
         material_balance = 0
         
-        for piece_type, value in self.piece_values.items():
+        # Get dynamic piece values based on current position
+        dynamic_values = self._get_dynamic_piece_values(board)
+        
+        for piece_type, value in dynamic_values.items():
             if piece_type == chess.KING:
                 continue
                 
@@ -141,13 +169,14 @@ class Evaluation:
         return material_balance if board.turn == chess.WHITE else -material_balance
     
     def _evaluate_positional(self, board: chess.Board) -> int:
-        """Enhanced positional evaluation using piece-square tables."""
+        """Enhanced positional evaluation using v1.3 game phase-aware piece-square tables."""
         positional_score = 0
+        game_phase = self._get_game_phase(board)
         
-        # Map piece types to their PST
+        # Map piece types to their PST (with game phase awareness)
         pst_map = {
             chess.PAWN: self.pawn_table,
-            chess.KNIGHT: self.knight_table,
+            chess.KNIGHT: self.knight_opening_table if game_phase == "opening" else self.knight_table,
             chess.BISHOP: self.bishop_table,
             chess.ROOK: self.rook_table,
             chess.QUEEN: self.queen_table,
@@ -164,6 +193,9 @@ class Evaluation:
             for square in board.pieces(piece_type, chess.BLACK):
                 table_index = self._square_to_table_index(square, chess.BLACK)
                 positional_score -= pst[table_index]
+        
+        # Add v1.3 development evaluation
+        positional_score += self._evaluate_development(board)
         
         # Return from perspective of side to move
         return positional_score if board.turn == chess.WHITE else -positional_score
@@ -304,22 +336,112 @@ class Evaluation:
         file = chess.square_file(king_square)
         # Center files are d(3), e(4)
         return file in [3, 4]
+    
+    def _get_dynamic_piece_values(self, board: chess.Board) -> Dict[int, int]:
+        """Calculate dynamic piece values based on current position - v1.3 enhancement."""
+        values = self.piece_values.copy()
+        
+        # Bishop pair evaluation for both sides
+        white_bishops = len(board.pieces(chess.BISHOP, chess.WHITE))
+        black_bishops = len(board.pieces(chess.BISHOP, chess.BLACK))
+        
+        # Store original bishop value for calculations
+        base_bishop_value = self.piece_values[chess.BISHOP]
+        
+        # For the side to move, adjust bishop values based on pair presence
+        if board.turn == chess.WHITE:
+            if white_bishops == 2:
+                values[chess.BISHOP] = base_bishop_value + self.bishop_pair_bonus
+            elif white_bishops == 1:
+                values[chess.BISHOP] = base_bishop_value - self.single_bishop_penalty
+        else:
+            if black_bishops == 2:
+                values[chess.BISHOP] = base_bishop_value + self.bishop_pair_bonus
+            elif black_bishops == 1:
+                values[chess.BISHOP] = base_bishop_value - self.single_bishop_penalty
+                
+        return values
+    
+    def _get_game_phase(self, board: chess.Board) -> str:
+        """Determine current game phase for v1.3 phase-aware evaluation."""
+        move_count = board.fullmove_number
+        total_pieces = len(board.piece_map())
+        
+        if move_count <= self.opening_move_threshold:
+            return "opening"
+        elif total_pieces < self.endgame_piece_threshold:
+            return "endgame"
+        else:
+            return "middlegame"
+    
+    def _evaluate_development(self, board: chess.Board) -> int:
+        """Evaluate piece development with v1.3 penalties for repeated moves and early queen development."""
+        development_score = 0
+        game_phase = self._get_game_phase(board)
+        
+        if game_phase != "opening":
+            return 0  # Only apply in opening
+        
+        # Track if queen has moved early (penalty)
+        for color in [chess.WHITE, chess.BLACK]:
+            multiplier = 1 if (color == board.turn) else -1
+            
+            # Check for early queen development
+            queen_square = None
+            queen_pieces = board.pieces(chess.QUEEN, color)
+            if queen_pieces:
+                queen_square = list(queen_pieces)[0]
+                
+                # Check if queen is off starting square too early
+                starting_queen_square = chess.D1 if color == chess.WHITE else chess.D8
+                if queen_square != starting_queen_square and board.fullmove_number <= 8:
+                    development_score += multiplier * (-self.early_queen_penalty)
+            
+            # Count undeveloped minor pieces
+            undeveloped_count = 0
+            
+            # Check knights
+            if color == chess.WHITE:
+                knight_start_squares = [chess.B1, chess.G1]
+            else:
+                knight_start_squares = [chess.B8, chess.G8]
+                
+            knights = board.pieces(chess.KNIGHT, color)
+            for start_square in knight_start_squares:
+                if start_square in knights:
+                    undeveloped_count += 1
+            
+            # Check bishops
+            if color == chess.WHITE:
+                bishop_start_squares = [chess.C1, chess.F1]
+            else:
+                bishop_start_squares = [chess.C8, chess.F8]
+                
+            bishops = board.pieces(chess.BISHOP, color)
+            for start_square in bishop_start_squares:
+                if start_square in bishops:
+                    undeveloped_count += 1
+            
+            # Bonus for having undeveloped pieces (encourages development)
+            development_score += multiplier * (undeveloped_count * self.minor_piece_unmoved_bonus)
+        
+        return development_score
 
 # ============================================================================
 # CUSTOM EVALUATION FUNCTIONS (Hot spots - most modified)
 # ============================================================================
 
     def _init_piece_square_tables(self):
-        """Initialize enhanced piece-square tables with stronger positional guidance."""
+        """Initialize enhanced piece-square tables with v1.3 stronger positional guidance."""
         
         # Enhanced Pawn PST - stronger advancement bonus
         self.pawn_table = [
              0,  0,  0,  0,  0,  0,  0,  0,  # 8th rank (promotion)
-            60, 60, 60, 60, 60, 60, 60, 60,  # 7th rank - stronger bonus
-            15, 15, 25, 35, 35, 25, 15, 15,  # 6th rank
-            10, 10, 15, 30, 30, 15, 10, 10,  # 5th rank
-             5,  5, 10, 25, 25, 10,  5,  5,  # 4th rank
-             0,  0,  0, 20, 20,  0,  0,  0,  # 3rd rank
+            80, 80, 80, 80, 80, 80, 80, 80,  # 7th rank - stronger bonus
+            25, 25, 35, 45, 45, 35, 25, 25,  # 6th rank
+            15, 15, 20, 35, 35, 20, 15, 15,  # 5th rank
+            10, 10, 15, 30, 30, 15, 10, 10,  # 4th rank
+             5,  5, 10, 25, 25, 10,  5,  5,  # 3rd rank
              5, 10, 10,-20,-20, 10, 10,  5,  # 2nd rank
              0,  0,  0,  0,  0,  0,  0,  0   # 1st rank
         ]
@@ -334,6 +456,18 @@ class Evaluation:
             -30,  0, 15, 20, 20, 15,  0,-30,
             -40,-20,  0,  5,  5,  0,-20,-40,
             -80,-40,-30,-25,-25,-30,-40,-80   # Extremely strong rim penalty
+        ]
+        
+        # v1.3 Opening knight table - harsh rim penalties for development
+        self.knight_opening_table = [
+            -150,-100, -75, -50, -50, -75,-100,-150,  # Rank 8 - very harsh
+            -100, -50, -25,  -5,  -5, -25, -50,-100,  # Rank 7
+             -75, -25,  20,  30,  30,  20, -25, -75,  # Rank 6
+             -50,  -5,  30,  40,  40,  30,  -5, -50,  # Rank 5
+             -50,  -5,  30,  40,  40,  30,  -5, -50,  # Rank 4
+             -75, -25,  20,  30,  30,  20, -25, -75,  # Rank 3
+             -100, -50, -25,  -5,  -5, -25, -50,-100,  # Rank 2
+             -150,-100, -75, -50, -50, -75,-100,-150   # Rank 1 - very harsh
         ]
         
         # Enhanced Bishop PST - improved diagonal control
@@ -360,16 +494,16 @@ class Evaluation:
              0,  0,  0, 10, 10,  0,  0,  0   # 1st rank
         ]
         
-        # Enhanced Queen PST - STRONG corner penalties to prevent Qh8-type moves
+        # Enhanced Queen PST - STRONG corner penalties to prevent Qh8-type moves with v1.3 early development penalties
         self.queen_table = [
-            -30,-20,-15,-10,-10,-15,-20,-30,  # 8th rank - VERY strong corner penalty
-            -20,-10, -5,  0,  0, -5,-10,-20,  # 7th rank
-            -15, -5,  5, 10, 10,  5, -5,-15,  # 6th rank
-            -10,  0, 10, 15, 15, 10,  0,-10,  # 5th rank
-            -10,  0, 10, 15, 15, 10,  0,-10,  # 4th rank
-            -15, -5,  5, 10, 10,  5, -5,-15,  # 3rd rank
-            -20,-10, -5,  0,  0, -5,-10,-20,  # 2nd rank
-            -30,-20,-15,-10,-10,-15,-20,-30   # 1st rank - VERY strong corner penalty
+            -50,-40,-30,-20,-20,-30,-40,-50,  # 8th rank - VERY strong corner penalty
+            -40,-20,-10, -5, -5,-10,-20,-40,  # 7th rank
+            -30,-10, 10, 15, 15, 10,-10,-30,  # 6th rank
+            -20, -5, 15, 20, 20, 15, -5,-20,  # 5th rank
+            -20, -5, 15, 20, 20, 15, -5,-20,  # 4th rank
+            -30,-10, 10, 15, 15, 10,-10,-30,  # 3rd rank
+            -40,-20,-10, -5, -5,-10,-20,-40,  # 2nd rank
+            -75,-50,-40,-30,-30,-40,-50,-75   # 1st rank - harsh early penalty
         ]
         
         # Enhanced King Middlegame PST - encourages castling
@@ -695,9 +829,9 @@ class Evaluation:
     # Debugging and testing utilities
     def get_evaluation_explanation(self, board: chess.Board) -> str:
         """Get human-readable explanation of position evaluation."""
-        score, breakdown = self.evaluate_detailed(board)
+        breakdown = self.evaluate_detailed(board)
         
-        explanation = f"Position Evaluation: {score}\\n"
+        explanation = f"Position Evaluation: {breakdown['total_score']}\\n"
         explanation += f"Material: {breakdown['material']}\\n"
         explanation += f"Positional: {breakdown['positional']}\\n"
         explanation += f"Tactical: {breakdown['tactical']}\\n"
