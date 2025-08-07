@@ -1,0 +1,317 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cece v1.3 Tournament Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #007bff;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        .chart-container {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .insights {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .insight {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 4px solid #ffc107;
+            background: white;
+        }
+        .severity-high { border-left-color: #dc3545; }
+        .severity-medium { border-left-color: #fd7e14; }
+        .severity-low { border-left-color: #28a745; }
+        .opening-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .opening-table th, .opening-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .opening-table th {
+            background-color: #f2f2f2;
+        }
+        .win-rate-good { color: #28a745; font-weight: bold; }
+        .win-rate-bad { color: #dc3545; font-weight: bold; }
+        .win-rate-average { color: #fd7e14; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏆 Cece v1.3 Tournament Analysis</h1>
+            <p><strong>Tournament:</strong> Engine Battle 20250806</p>
+            <p><strong>Analysis Date:</strong> 2025-08-07T17:17:58</p>
+            <p><strong>Games Analyzed:</strong> 23</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">7</div>
+                <div class="stat-label">Wins</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">1</div>
+                <div class="stat-label">Losses</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">15</div>
+                <div class="stat-label">Draws</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">30.4%</div>
+                <div class="stat-label">Win Rate</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3>📊 Performance Overview</h3>
+            <canvas id="performanceChart" width="400" height="200"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h3>⚫⚪ Performance by Color</h3>
+            <canvas id="colorChart" width="400" height="200"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h3>📈 Game Timeline</h3>
+            <canvas id="timelineChart" width="400" height="200"></canvas>
+        </div>
+
+        <div class="insights">
+            <h3>🔍 Key Insights & Recommendations</h3>
+
+            <div class="insight severity-high">
+                <strong>🚨 Low Win Rate</strong><br>
+                Win rate of 30.4% is below target. Focus on improving tactical awareness and endgame technique.
+            </div>
+
+            <div class="insight severity-high">
+                <strong>🚨 Rules Infractions</strong><br>
+                Engine made illegal moves. Check move generation and validation logic.
+            </div>
+
+        </div>
+
+        <div class="chart-container">
+            <h3>🎯 Opening Performance Analysis</h3>
+            <table class="opening-table">
+                <thead>
+                    <tr>
+                        <th>Opening</th>
+                        <th>Games</th>
+                        <th>Wins</th>
+                        <th>Draws</th>
+                        <th>Losses</th>
+                        <th>Win Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                    <tr>
+                        <td>Saragossa Opening</td>
+                        <td>3</td>
+                        <td>2</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="win-rate-good">66.7%</td>
+                    </tr>
+
+                    <tr>
+                        <td>Mieses Opening</td>
+                        <td>2</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="win-rate-good">50.0%</td>
+                    </tr>
+
+                    <tr>
+                        <td>Reti Opening</td>
+                        <td>10</td>
+                        <td>4</td>
+                        <td>5</td>
+                        <td>1</td>
+                        <td class="win-rate-average">40.0%</td>
+                    </tr>
+
+                    <tr>
+                        <td>Unknown</td>
+                        <td>3</td>
+                        <td>0</td>
+                        <td>3</td>
+                        <td>0</td>
+                        <td class="win-rate-bad">0.0%</td>
+                    </tr>
+
+                    <tr>
+                        <td>Amar (Paris) Opening</td>
+                        <td>5</td>
+                        <td>0</td>
+                        <td>5</td>
+                        <td>0</td>
+                        <td class="win-rate-bad">0.0%</td>
+                    </tr>
+
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Performance Overview Chart
+        const performanceCtx = document.getElementById('performanceChart').getContext('2d');
+        const performanceChart = new Chart(performanceCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Wins', 'Losses', 'Draws'],
+                datasets: [{
+                    data: [7, 1, 15],
+                    backgroundColor: ['#4CAF50', '#F44336', '#FF9800'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Color Performance Chart
+        const colorCtx = document.getElementById('colorChart').getContext('2d');
+        const colorChart = new Chart(colorCtx, {
+            type: 'bar',
+            data: {
+                labels: ['White', 'Black'],
+                datasets: [{
+                    label: 'Win Rate',
+                    data: [0.400, 0.231],
+                    backgroundColor: ['#007bff', '#6c757d'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 1,
+                        ticks: {
+                            callback: function(value) {
+                                return (value * 100).toFixed(0) + '%';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+        // Timeline Chart
+        const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+        const timelineData = [{"game": 1, "result": "draw", "opponent": "SlowMate_v0.1.0_BETA", "length": 0, "patterns": 0}, {"game": 2, "result": "draw", "opponent": "Cecilia_v0.1.0_Basic", "length": 0, "patterns": 0}, {"game": 3, "result": "draw", "opponent": "Cecilia_v0.1.0_Basic", "length": 0, "patterns": 0}, {"game": 4, "result": "draw", "opponent": "Cecilia_v0.1.0_Basic", "length": 16, "patterns": 0}, {"game": 5, "result": "win", "opponent": "SlowMate_v0.4.03_Stable_Baseline", "length": 44, "patterns": 0}, {"game": 6, "result": "draw", "opponent": "Cecilia_v0.1.0_Basic", "length": 13, "patterns": 0}, {"game": 7, "result": "win", "opponent": "SlowMate_v0.4.03_Stable_Baseline", "length": 53, "patterns": 0}, {"game": 8, "result": "draw", "opponent": "Cecilia_v0.1.0_Basic", "length": 16, "patterns": 0}, {"game": 9, "result": "win", "opponent": "SlowMate_v0.4.03_Stable_Baseline", "length": 28, "patterns": 0}, {"game": 10, "result": "draw", "opponent": "Cecilia_v0.1.0_Basic", "length": 13, "patterns": 0}, {"game": 11, "result": "win", "opponent": "SlowMate_v0.4.03_Stable_Baseline", "length": 33, "patterns": 0}, {"game": 12, "result": "draw", "opponent": "Cecilia_v0.1.0_Basic", "length": 16, "patterns": 0}, {"game": 13, "result": "win", "opponent": "SlowMate_v0.4.03_Stable_Baseline", "length": 69, "patterns": 0}, {"game": 14, "result": "draw", "opponent": "Cecilia_v0.1.0_Basic", "length": 13, "patterns": 0}, {"game": 15, "result": "win", "opponent": "SlowMate_v0.4.03_Stable_Baseline", "length": 63, "patterns": 0}, {"game": 16, "result": "draw", "opponent": "Cecilia_v0.1.0_Basic", "length": 16, "patterns": 0}, {"game": 17, "result": "loss", "opponent": "SlowMate_v0.4.03_Stable_Baseline", "length": 122, "patterns": 0}, {"game": 18, "result": "draw", "opponent": "Cecilia_v0.1.0_Basic", "length": 13, "patterns": 0}, {"game": 19, "result": "draw", "opponent": "SlowMate_v0.4.03_Stable_Baseline", "length": 211, "patterns": 0}, {"game": 20, "result": "draw", "opponent": "Cecilia_v0.1.0_Basic", "length": 16, "patterns": 0}, {"game": 21, "result": "win", "opponent": "SlowMate_v0.4.03_Stable_Baseline", "length": 38, "patterns": 0}, {"game": 22, "result": "draw", "opponent": "Cecilia_v0.1.0_Basic", "length": 13, "patterns": 0}, {"game": 23, "result": "draw", "opponent": "SlowMate_v0.4.03_Stable_Baseline", "length": 215, "patterns": 0}];
+        
+        const timelineChart = new Chart(timelineCtx, {
+            type: 'line',
+            data: {
+                labels: timelineData.map(game => game.game),
+                datasets: [{
+                    label: 'Game Results',
+                    data: timelineData.map(game => {
+                        if (game.result === 'win') return 1;
+                        if (game.result === 'loss') return -1;
+                        return 0;
+                    }),
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        min: -1.5,
+                        max: 1.5,
+                        ticks: {
+                            callback: function(value) {
+                                if (value === 1) return 'Win';
+                                if (value === 0) return 'Draw';
+                                if (value === -1) return 'Loss';
+                                return '';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
