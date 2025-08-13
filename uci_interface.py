@@ -213,7 +213,9 @@ class UCIInterface:
         try:
             best_move = self.engine.get_best_move(depth, time_limit)
             if best_move:
-                self.send(f"bestmove {best_move}")
+                # Convert chess.Move to UCI string format
+                move_uci = best_move.uci()
+                self.send(f"bestmove {move_uci}")
             else:
                 # No legal moves (checkmate or stalemate)
                 self.send("bestmove 0000")

@@ -1,0 +1,26 @@
+[Event "Computer chess game"]
+[Site "MAIN-DESKTOP"]
+[Date "2025.08.06"]
+[Round "?"]
+[White "Cece_v1.3"]
+[Black "Cece_v1.0"]
+[Result "1-0"]
+[BlackElo "100"]
+[ECO "A04"]
+[Opening "Reti Opening"]
+[Time "21:27:37"]
+[Variation "Herrström Gambit"]
+[WhiteElo "2000"]
+[TimeControl "120+1"]
+[Termination "rules infraction"]
+[PlyCount "61"]
+[WhiteType "program"]
+[BlackType "program"]
+
+1. Nf3 g5 2. Ne5 Bh6 3. Nxf7 d6 4. Nxd8 Kf8 5. Rg1 Ke8 6. Nxb7 Nf6 7. Nxd6+
+Kf8 8. Nxc8 Ke8 9. Nxa7 Rg8 10. Nb5 Rh8 11. Nxc7+ Kd7 12. Nxa8 Re8 13. d3
+Rh8 14. Nb6+ Kd6 15. f3 Re8 16. e3 Rc8 17. Nxc8+ Kc7 18. Qd2 Kd8 19. Qb4
+Kd7 20. Qa4+ Ke6 21. Qh4 Nbd7 22. Qc4+ Kf5 23. Nxe7+ Ke5 24. Qf7 Ne4 25.
+Qd5+ Kf6 26. Qxd7 Ke5 27. Qd5+ Kf6 28. Be2 Kg7 29. Qg8+ Kf6 30. Nd5+ Kf5
+31. Ne7 {Arena Adjudication. Illegal move!} 1-0
+

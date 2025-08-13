@@ -1,0 +1,23 @@
+[Event "Engine Battle 20250803"]
+[Site "MAIN-DESKTOP"]
+[Date "2025.08.03"]
+[Round "1"]
+[White "Cece_v1.1"]
+[Black "Cece_v1.1"]
+[Result "0-1"]
+[BlackElo "2000"]
+[ECO "A00"]
+[Opening "Amar (Paris) Opening"]
+[Time "19:28:33"]
+[WhiteElo "2000"]
+[TimeControl "120+1"]
+[Termination "rules infraction"]
+[PlyCount "34"]
+[WhiteType "program"]
+[BlackType "program"]
+
+1. Nh3 f6 2. Ng5 g6 3. Nxh7 Nh6 4. Nxf8 Rh7 5. Nxh7 c6 6. f4 e6 7. a3 d6 8.
+g3 Qe7 9. Nxf6+ Kd8 10. Ne4 Bd7 11. Rg1 Qf8 12. Nf2 Qh8 13. Rg2 Qg8 14. Rg1
+Qh7 15. Rg2 Qg8 16. Nc3 Qe8 17. Nd5 Qh8 {Arena Adjudication. Illegal move!}
+0-1
+
