@@ -410,7 +410,7 @@ class ChessEngine:
             
             # Captures: use SEE evaluation
             if self.board.is_capture(move):
-                see_value = self.evaluator._see_evaluate_capture_v2(self.board, move)
+                see_value = self.evaluator._see_evaluate_capture(self.board, move)
                 score += see_value
                 
             # Promotions
@@ -441,7 +441,7 @@ class ChessEngine:
             
             # Captures get priority based on SEE evaluation
             if self.board.is_capture(move):
-                see_value = self.evaluator._see_evaluate_capture_v2(self.board, move)
+                see_value = self.evaluator._see_evaluate_capture(self.board, move)
                 if see_value > 0:
                     score += 10000 + see_value  # High priority for winning captures
                 else:

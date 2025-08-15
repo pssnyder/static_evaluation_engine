@@ -46,10 +46,10 @@ class Evaluation:
         self.bishop_pair_bonus = 25      # +0.25 pawns when both bishops present
         self.single_bishop_penalty = 25  # -0.25 pawns when only one bishop
         
-        # v1.3 Development penalties
-        self.same_piece_twice_penalty = 50   # -0.50 pawns for moving same piece twice
-        self.early_queen_penalty = 75        # -0.75 pawns for early queen moves
-        self.minor_piece_unmoved_bonus = 30  # +0.30 pawns per undeveloped minor piece
+        # v2.2 Development penalties - ENHANCED
+        self.same_piece_twice_penalty = 100  # DOUBLED from 50 - Harsh penalty for repetition
+        self.early_queen_penalty = 150       # DOUBLED from 75 - Very harsh early queen penalty
+        self.minor_piece_unmoved_bonus = 50  # INCREASED from 30 - Higher development priority
         
         # v1.3 King safety zones and bonuses
         self.king_safety_zone_bonus = 20    # +0.20 pawns per protected square
@@ -130,15 +130,17 @@ class Evaluation:
         threat_score = self._evaluate_threats(board)
         castling_score = self._evaluate_castling(board)
         king_safety_score = self._evaluate_king_safety(board)
+        rook_preservation_score = self._evaluate_rook_preservation(board)  # NEW v2.2
         
-        # Calculate total with hardcoded weights
+        # Calculate total with v2.2 ENHANCED weights for castling priority
         total_score = (
             material_score * 1.0 +
             positional_score * 0.6 +
             tactical_score * 0.9 +
             threat_score * 0.5 +
-            castling_score * 0.4 +
-            king_safety_score * 0.8
+            castling_score * 1.5 +         # MASSIVE increase from 0.4
+            king_safety_score * 0.8 +
+            rook_preservation_score * 1.2  # NEW category
         )
         
         # Return breakdown dictionary (compatible with engine interface)
@@ -149,6 +151,7 @@ class Evaluation:
             'threats': threat_score,
             'castling': castling_score,
             'king_safety': king_safety_score,
+            'rook_preservation': rook_preservation_score,  # NEW v2.2
             'total_score': int(total_score)
         }
 
@@ -214,7 +217,7 @@ class Evaluation:
         # Get all captures and evaluate them using improved SEE
         for move in board.legal_moves:
             if board.is_capture(move):
-                see_value = self._see_evaluate_capture_v2(board, move)
+                see_value = self._see_evaluate_capture(board, move)
                 
                 # v2.0: Don't cap material gains - let SEE guide decisions
                 if see_value > 0:
@@ -248,12 +251,12 @@ class Evaluation:
         return threat_score
     
     def _evaluate_castling(self, board: chess.Board) -> int:
-        """Evaluate castling rights and king safety."""
-        # Castling evaluation parameters
-        castling_rights_bonus = 15
-        castled_bonus = 50
-        early_game_urgency = 30
-        exposed_king_penalty = -100
+        """Evaluate castling rights and king safety with v2.2 enhanced priorities."""
+        # ENHANCED castling evaluation parameters for v2.2
+        castling_rights_bonus = 200  # Massive increase from 15
+        castled_bonus = 150         # Increased from 50
+        early_game_urgency = 100    # Increased from 30
+        exposed_king_penalty = -300 # Massive penalty from -100
         
         score = 0
         
@@ -439,6 +442,48 @@ class Evaluation:
         
         return development_score
 
+    def _evaluate_rook_preservation(self, board: chess.Board) -> int:
+        """NEW v2.2: Evaluate rook positioning to preserve castling rights."""
+        preservation_score = 0
+        game_phase = self._get_game_phase(board)
+        
+        # Only apply harsh penalties in opening and early middlegame
+        if game_phase not in ["opening", "middlegame"]:
+            return 0
+            
+        for color in [chess.WHITE, chess.BLACK]:
+            multiplier = 1 if (color == board.turn) else -1
+            
+            # Check if rooks are still on starting squares
+            if color == chess.WHITE:
+                starting_rook_squares = [chess.A1, chess.H1]
+                king_square = chess.E1
+            else:
+                starting_rook_squares = [chess.A8, chess.H8]
+                king_square = chess.E8
+                
+            rooks = board.pieces(chess.ROOK, color)
+            king = board.king(color)
+            
+            # Heavy penalty if rook moved from starting square while king still on starting square
+            if king and king == king_square:  # King still on starting square
+                for start_square in starting_rook_squares:
+                    if start_square not in rooks:  # Rook has moved
+                        # Apply penalty for moving rook early (regardless of current castling rights)
+                        # This penalizes the rook move that lost castling
+                        if color == chess.WHITE:
+                            if start_square == chess.A1:  # Queenside rook moved
+                                preservation_score += multiplier * (-200)  # Massive penalty
+                            elif start_square == chess.H1:  # Kingside rook moved
+                                preservation_score += multiplier * (-200)  # Massive penalty
+                        else:
+                            if start_square == chess.A8:  # Queenside rook moved
+                                preservation_score += multiplier * (-200)  # Massive penalty
+                            elif start_square == chess.H8:  # Kingside rook moved
+                                preservation_score += multiplier * (-200)  # Massive penalty
+        
+        return preservation_score
+
 # ============================================================================
 # CUSTOM EVALUATION FUNCTIONS (Hot spots - most modified)
 # ============================================================================
@@ -532,100 +577,7 @@ class Evaluation:
 
     def _see_evaluate_capture(self, board: chess.Board, move: chess.Move) -> int:
         """
-        Static Exchange Evaluation for capture moves.
-        
-        Calculates material gain/loss from capture sequence on target square.
-        """
-        if not board.is_capture(move):
-            return 0
-            
-        # Get the target square and initial victim
-        target_square = move.to_square
-        victim = board.piece_at(target_square)
-        
-        if not victim:
-            return 0
-            
-        # Start the exchange sequence
-        gain = [self.piece_values[victim.piece_type]]
-        
-        # Make the initial capture
-        board_copy = board.copy()
-        board_copy.push(move)
-        
-        # Get attacking piece value
-        attacker = board.piece_at(move.from_square)
-        if attacker:
-            attacking_piece_value = self.piece_values[attacker.piece_type]
-        else:
-            return gain[0]  # No attacker somehow
-        
-        # Continue the exchange sequence
-        self._see_continue_exchange(board_copy, target_square, attacking_piece_value, gain)
-        
-        # Calculate final result using minimax
-        return self._see_minimax_gain(gain)
-    
-    def _see_continue_exchange(self, board: chess.Board, square: chess.Square, 
-                              last_attacker_value: int, gain: List[int]):
-        """Continue the SEE exchange sequence recursively."""
-        
-        # Find the least valuable attacker
-        attacker_move = self._see_find_least_valuable_attacker(board, square)
-        
-        if not attacker_move:
-            return  # No more attackers
-            
-        # Get the attacking piece
-        attacker = board.piece_at(attacker_move.from_square)
-        if not attacker:
-            return
-            
-        attacker_value = self.piece_values[attacker.piece_type]
-        
-        # Add the captured piece value to gain
-        gain.append(last_attacker_value - gain[-1])
-        
-        # Make the capture
-        board.push(attacker_move)
-        
-        # Continue recursively
-        self._see_continue_exchange(board, square, attacker_value, gain)
-    
-    def _see_find_least_valuable_attacker(self, board: chess.Board, 
-                                        square: chess.Square) -> Optional[chess.Move]:
-        """Find the least valuable piece that can attack the square."""
-        
-        attacking_moves = []
-        
-        # Check all legal moves for attacks on the square
-        for move in board.legal_moves:
-            if move.to_square == square and board.is_capture(move):
-                attacker = board.piece_at(move.from_square)
-                if attacker:
-                    attacking_moves.append((move, self.piece_values[attacker.piece_type]))
-        
-        if not attacking_moves:
-            return None
-            
-        # Return move with least valuable attacker
-        attacking_moves.sort(key=lambda x: x[1])
-        return attacking_moves[0][0]
-    
-    def _see_minimax_gain(self, gain: List[int]) -> int:
-        """Calculate final SEE gain using minimax principle."""
-        if not gain:
-            return 0
-            
-        # Work backwards through the gain list
-        for i in range(len(gain) - 2, -1, -1):
-            gain[i] = max(0, gain[i] - gain[i + 1])
-            
-        return gain[0]
-
-    def _see_evaluate_capture_v2(self, board: chess.Board, move: chess.Move) -> int:
-        """
-        Improved Static Exchange Evaluation for v2.0 - fixes multiple issues.
+        Static Exchange Evaluation - v2.2 Enhanced Version
         
         This version:
         - Handles en passant captures correctly
@@ -665,7 +617,7 @@ class Evaluation:
         
         while True:
             # Find least valuable attacker for current side
-            next_capture = self._find_least_valuable_attacker_v2(board_copy, target_square)
+            next_capture = self._find_least_valuable_attacker(board_copy, target_square)
             
             if not next_capture:
                 break  # No more attackers
@@ -686,9 +638,9 @@ class Evaluation:
             board_copy.push(next_capture)
         
         # Use minimax to determine final result
-        return self._see_minimax_gain_v2(gain)
+        return self._see_minimax_gain(gain)
     
-    def _find_least_valuable_attacker_v2(self, board: chess.Board, 
+    def _find_least_valuable_attacker(self, board: chess.Board, 
                                         target_square: chess.Square) -> Optional[chess.Move]:
         """Find the least valuable piece that can attack the target square."""
         
@@ -709,7 +661,7 @@ class Evaluation:
         candidate_moves.sort(key=lambda x: x[1])
         return candidate_moves[0][0]
     
-    def _see_minimax_gain_v2(self, gain: List[int]) -> int:
+    def _see_minimax_gain(self, gain: List[int]) -> int:
         """Calculate final SEE gain using corrected minimax principle."""
         if not gain:
             return 0
